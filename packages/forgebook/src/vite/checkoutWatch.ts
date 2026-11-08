@@ -12,6 +12,11 @@
  * files changed, and each that the checkout wrote is handed to Vite's watcher as its own event, so every path a real
  * event takes (the lists, the modules, the pages' reload) runs as it would have.
  *
+ * The moves come from git's reflog of `HEAD`, read from where the last check stopped: a switch and a switch back that
+ * land between two checks leave `HEAD` where it was, yet rewrote files, and a page that loaded in between holds the
+ * other branch's stories. Each move's files are handed on, the later move standing for a file both wrote. With no
+ * reflog, the commit seen last is compared with the one now.
+ *
  * Only files the checkout wrote are handed on: one git lists that is untouched on disk since the last checkout seen (a
  * commit, which changes `HEAD` and rewrites nothing) is not, nor a file it says was removed that is still there. A
  * checkout that keeps `HEAD` where it was (`git checkout -- <file>`, `git stash`) changes no commit and is left to the
@@ -20,7 +25,7 @@
  * @module
  */
 import { execFile } from "node:child_process";
-import { statSync } from "node:fs";
+import { closeSync, openSync, readSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
@@ -101,6 +106,49 @@ export const checkoutEvents = (
   return events;
 };
 
+/** A move of `HEAD` from one commit to another, as git's reflog of `HEAD` records it. */
+export type HeadMove = {
+  /** The commit before. */
+  readonly from: string;
+  /** The commit after. */
+  readonly to: string;
+};
+
+/** A reflog line's two commits, before the name and the message: 40 or 64 hexadecimal digits each. */
+const REFLOG_LINE = /^([0-9a-f]{40}(?:[0-9a-f]{24})?) ([0-9a-f]{40}(?:[0-9a-f]{24})?) /;
+
+/**
+ * The moves of `HEAD` in what git appended to its reflog, in order, each that changed the commit: a branch switched and
+ * switched back before a check reads `HEAD` is two moves, though `HEAD` ends where it was.
+ *
+ * @param appended - the reflog's lines written since the last check.
+ */
+export const headMoves = (appended: string): HeadMove[] =>
+  appended.split("\n").flatMap((line): HeadMove[] => {
+    const [, from = "", to = ""] = REFLOG_LINE.exec(line) ?? [];
+    return from === "" || from === to || /^0+$/.test(from) ? [] : [{ from, to }];
+  });
+
+/** What a reflog holds past a point, and where it ends; none when it cannot be read or was rewritten shorter. */
+const reflogFrom = (
+  file: string,
+  offset: number
+): { readonly text: string; readonly end: number } | undefined => {
+  const size = statSync(file, { throwIfNoEntry: false })?.size;
+  if (size === undefined || size < offset) return undefined;
+  const buffer = Buffer.alloc(size - offset);
+  const handle = openSync(file, "r");
+  try {
+    readSync(handle, buffer, 0, buffer.length, offset);
+  } finally {
+    closeSync(handle);
+  }
+  // a line git is still writing is read at the next check
+  const text = buffer.toString("utf8");
+  const complete = text.lastIndexOf("\n") + 1;
+  return { text: text.slice(0, complete), end: offset + Buffer.byteLength(text.slice(0, complete)) };
+};
+
 /** Runs git in a folder and gives what it wrote, trimmed; none when it fails (no repository, no commit yet). */
 export type RunGit = (dir: string, args: readonly string[]) => Promise<string | undefined>;
 
@@ -161,30 +209,51 @@ export const checkoutWatch = (options: CheckoutWatchOptions): CheckoutWatch => {
   let head: string | undefined;
   let since = Date.now();
   let top = "";
+  // the reflog of `HEAD`, and how far it was read
+  let reflog = "";
+  let reflogEnd = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   // one check at a time, in order: two checkouts in a row are compared each with the one before
   let checking: Promise<void> = Promise.resolve();
+  /**
+   * The moves since the last check: from the reflog of `HEAD`, which records a switch and a switch back that leave
+   * `HEAD` where it was; else the one move from the commit seen last to the one now.
+   */
+  const movesTo = (now: string): readonly HeadMove[] => {
+    const appended = reflog === "" ? undefined : reflogFrom(reflog, reflogEnd);
+    if (appended !== undefined) {
+      reflogEnd = appended.end;
+      const moves = headMoves(appended.text);
+      if (moves.length > 0 && moves.at(-1)?.to === now) return moves;
+    }
+    return head === undefined || head === now ? [] : [{ from: head, to: now }];
+  };
+  /** Each move's files, the later standing: a file written by two moves is told once, as the disk has it now. */
+  const movesEvents = async (moves: readonly HeadMove[]): Promise<readonly CheckoutEvent[]> => {
+    const events = new Map<string, CheckoutEvent>();
+    for (const { from, to } of moves) {
+      const listed = await git(options.dir, [
+        "diff",
+        "--name-status",
+        "-z",
+        "--no-renames",
+        "--no-ext-diff",
+        from,
+        to
+      ]);
+      for (const event of checkoutEvents(listed ?? "", top, since, options.status))
+        events.set(event.file, event);
+    }
+    return [...events.values()];
+  };
   const check = async (): Promise<void> => {
     const seenAt = Date.now();
     const now = await git(options.dir, ["rev-parse", "--verify", "--quiet", "HEAD"]);
-    if (isClosed || now === undefined || now === head) return;
-    const before = head;
+    if (isClosed || now === undefined) return;
+    const moves = head === undefined ? [] : movesTo(now);
     head = now;
-    const listed =
-      before === undefined
-        ? undefined
-        : await git(options.dir, [
-            "diff",
-            "--name-status",
-            "-z",
-            "--no-renames",
-            "--no-ext-diff",
-            before,
-            now
-          ]);
-    if (listed !== undefined && !isClosed) {
-      for (const event of checkoutEvents(listed, top, since, options.status)) options.onEvent(event);
-    }
+    const events = await movesEvents(moves);
+    if (!isClosed) for (const event of events) options.onEvent(event);
     since = seenAt;
   };
   const schedule = (): void => {
@@ -226,6 +295,8 @@ export const checkoutWatch = (options: CheckoutWatchOptions): CheckoutWatch => {
     if (gitDir === undefined || shown === undefined || isClosed) return;
     top = shown;
     head = await git(options.dir, ["rev-parse", "--verify", "--quiet", "HEAD"]);
+    reflog = join(gitDir, "logs", "HEAD");
+    reflogEnd = statSync(reflog, { throwIfNoEntry: false })?.size ?? 0;
     since = Date.now();
     // `HEAD` moves with a switch; the index is rewritten by every checkout, a reset of the branch included
     for (const name of ["HEAD", "index"]) follow(join(gitDir, name));

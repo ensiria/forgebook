@@ -15,7 +15,8 @@ import {
   type CheckoutEvent,
   type CheckoutWatch,
   checkoutEvents,
-  checkoutWatch
+  checkoutWatch,
+  headMoves
 } from "../src/vite/checkoutWatch.ts";
 import type { WatchFile } from "../src/vite/closeWatch.ts";
 import { VITE_PATHS } from "../src/vite/vitePaths.ts";
@@ -65,6 +66,26 @@ describe("the events a checkout makes", () => {
     const status = (): { changedAt: number } => ({ changedAt: since - 500 });
     expect(checkoutEvents(["M", "a.ts", ""].join("\0"), top, since, status)).toEqual([
       { kind: "change", file: viteFile(top, "a.ts") }
+    ]);
+  });
+});
+
+describe("the moves of HEAD in its reflog", () => {
+  const a = "a".repeat(40);
+  const b = "b".repeat(40);
+  const zero = "0".repeat(40);
+
+  it("gives each move that changed the commit, in order, and leaves out a line still being written", () => {
+    const appended = [
+      `${zero} ${a} T <t@example.com> 1 +0000\tcommit (initial): main`,
+      `${a} ${b} T <t@example.com> 2 +0000\tcheckout: moving from main to other`,
+      `${b} ${b} T <t@example.com> 3 +0000\tcheckout: moving from other to other`,
+      `${b} ${a} T <t@example.com> 4 +0000\tcheckout: moving from other to main`,
+      ""
+    ].join("\n");
+    expect(headMoves(appended)).toEqual([
+      { from: a, to: b },
+      { from: b, to: a }
     ]);
   });
 });
@@ -159,6 +180,30 @@ describe("a repository's checkout watch", () => {
     fake.fireAll();
     await watch.settled();
     expect(events.filter((event) => !event.file.endsWith("README.md"))).toEqual([]);
+  }, 30_000);
+
+  it("hands on what a switch and a switch back wrote before a check, though HEAD ends where it was", async () => {
+    const events: CheckoutEvent[] = [];
+    const fake = fakeWatches();
+    watch = checkoutWatch({
+      dir: repo,
+      onEvent: (event: CheckoutEvent) => events.push(event),
+      watchFile: fake.watchFile
+    });
+    await watch.ready;
+    git("switch", "-q", "other");
+    git("switch", "-q", "main");
+    fake.fireAll();
+    await watch.settled();
+    // a page that loaded on the other branch holds its stories: the files main wrote back are told
+    expect(events).toEqual(
+      expect.arrayContaining([
+        { kind: "change", file: viteFile(repo, "src/Button.stories.ts") },
+        { kind: "add", file: viteFile(repo, "src/Card.stories.ts") },
+        { kind: "unlink", file: viteFile(repo, "src/forms/Field.stories.ts") }
+      ])
+    );
+    expect(events).toHaveLength(3);
   }, 30_000);
 
   it("hears a switch through git's own files, with no system event for the stories", async () => {
