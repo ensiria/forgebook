@@ -157,8 +157,13 @@ const plainValue = (value: string, wrapper: "hsl" | "rgb" | undefined): string =
   return sum ?? text;
 };
 
-/** The declarations in force in a theme: its own over the base. */
-const layerOf = (
+/**
+ * The declarations in force in a theme: its own over the base.
+ *
+ * @param declarations - every declaration, the lowest priority first.
+ * @param mode - the theme; none for the base.
+ */
+export const layerOf = (
   declarations: readonly TokenDeclaration[],
   mode: string | undefined
 ): ReadonlyMap<string, TokenDeclaration> => {
