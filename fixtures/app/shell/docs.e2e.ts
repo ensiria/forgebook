@@ -349,7 +349,9 @@ test.describe("docs pages", () => {
     const pageModule = /\/DocPage[.-][^/]*$/;
     await page.route(pageModule, (route) => route.abort());
     await page.goto(STARTED);
-    await expect(page.getByRole("alert")).toContainText("The page could not be loaded. Reload to try again.");
+    await expect(page.getByRole("alert")).toContainText(
+      "The page could not be loaded: reload the page to try again."
+    );
     await page.unroute(pageModule);
     await page.reload();
     await expect(page.locator("h1")).toHaveText("Getting started");
