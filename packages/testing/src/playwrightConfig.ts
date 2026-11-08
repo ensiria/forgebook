@@ -26,6 +26,11 @@ export type StoryTestServer = {
   /** How many tests run at once; every core when left out or not a positive number. */
   readonly workers?: number;
   /**
+   * How many times a failed test runs again; 2 in CI (`CI` set) and none elsewhere when left out, as Playwright's own
+   * template has it. A retry that passes is reported as flaky, never as passed.
+   */
+  readonly retries?: number;
+  /**
    * The command that runs Vite (`node ./node_modules/vite/bin/vite.js`); by default the package manager that runs
    * the tests runs it (`frameServerCommand`).
    */
@@ -69,6 +74,17 @@ const webServer = ({ dir, port, vite }: StoryTestServer): NonNullable<Playwright
 });
 
 /**
+ * How many times a failed test runs again: the package's count, or 2 in CI and none on a developer's machine. A CI
+ * runner shared by many tests loses a test's browser now and then (`newPage` fails with "Target page, context or
+ * browser has been closed" before the story opens), which says nothing of the story; locally a failure is to look at.
+ *
+ * @param server - the package's folder and ports, with its own count if it gives one.
+ * @param ci - the `CI` variable, set by every CI service.
+ */
+export const retriesOf = ({ retries }: StoryTestServer, ci: string | undefined): number =>
+  retries ?? (ci === undefined || ci === "" ? 0 : 2);
+
+/**
  * The browser tests' configuration: `stories.spec.ts` in the host's Chromium.
  *
  * @param server - the package's folder and ports.
@@ -78,6 +94,7 @@ export const storyTestConfig = (server: StoryTestServer): PlaywrightTestConfig =
   testMatch: "stories.spec.ts",
   fullyParallel: true,
   workers: workersOf(server),
+  retries: retriesOf(server, process.env["CI"]),
   reporter: [["list"]],
   webServer: webServer(server),
   use: { browserName: "chromium", baseURL: `http://127.0.0.1:${server.port}/` }
@@ -97,6 +114,7 @@ export const visualTestConfig = (server: StoryTestServer): PlaywrightTestConfig 
     snapshotPathTemplate: "{testDir}/__screenshots__/{arg}{ext}",
     fullyParallel: true,
     workers: workersOf(server),
+    retries: retriesOf(server, process.env["CI"]),
     reporter: [["list"]],
     webServer: webServer(server),
     ...(isInContainer ? {} : { globalSetup: `${server.dir}/visualBrowser.ts` }),

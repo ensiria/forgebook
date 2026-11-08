@@ -12,8 +12,10 @@
  *
  * @module
  */
-import { globSync, statSync } from "node:fs";
+import { type Dirent, globSync, readdirSync, statSync } from "node:fs";
+import { posix } from "node:path";
 
+import { patternBase } from "./autoTitle.ts";
 import { VITE_PATHS, type VitePaths } from "./vitePaths.ts";
 
 /** What starts a pattern that leaves files out. */
@@ -147,9 +149,57 @@ export const unmatchedPatterns = (root: string, patterns: readonly string[]): re
   // a pattern can match folders alone (`stories/**` over empty ones), which hold no story
   const isFile = ({ key }: ListedFile): boolean =>
     statSync(VITE_PATHS.resolve(root, key), { throwIfNoEntry: false })?.isFile() === true;
+  // a `!` pattern left out of a pattern that lists nothing anyway changes nothing, so the walk ignores them: with any,
+  // the full listing decides
   return patterns
     .filter((pattern) => !isNegated(pattern))
-    .filter((pattern) => !listedFiles(root, [pattern, ...leftOut]).some(isFile));
+    .filter(
+      (pattern) =>
+        !(leftOut.length === 0 && hasMatchingFile(root, pattern)) &&
+        !listedFiles(root, [pattern, ...leftOut]).some(isFile)
+    );
+};
+
+/**
+ * A folder's entries, none when it cannot be read (gone, or not a folder): the walk goes on with the others.
+ *
+ * @param root - the folder the path is relative to.
+ * @param folder - the folder, relative to the root; `""` for the root itself.
+ */
+const folderEntries = (root: string, folder: string): readonly Dirent[] => {
+  try {
+    return readdirSync(VITE_PATHS.resolve(root, folder === "" ? "." : folder), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Whether a pattern matches a file, the walk from the pattern's static folder ending at the first one: telling that a
+ * pattern lists something should not cost a walk of the whole tree, which on a large library is a tenth of a second
+ * on the thread that starts the server, before anything is drawn. It finds only files the glob would list (the same
+ * matching, the dependencies left out); finding none decides nothing, and the full listing is asked then.
+ *
+ * @param root - the folder the pattern is relative to.
+ * @param pattern - the pattern, without a `!`.
+ */
+const hasMatchingFile = (root: string, pattern: string): boolean => {
+  const plain = pattern.replace(/^(?:\.\/)+/, "");
+  const isDependencyNamed = pattern.includes(DEPENDENCIES);
+  // the glob enters no hidden folder (`.git`) unless the pattern names one, and nor does the walk
+  const isHiddenNamed = plain.split("/").some((segment) => segment.startsWith(".") && segment !== "..");
+  const isWalked = (entry: Dirent): boolean =>
+    (isDependencyNamed || entry.name !== DEPENDENCIES) && (isHiddenNamed || !entry.name.startsWith("."));
+  const folders = [patternBase(plain)];
+  while (folders.length > 0) {
+    const folder = folders.pop() ?? "";
+    for (const entry of folderEntries(root, folder)) {
+      const path = folder === "" ? entry.name : `${folder}/${entry.name}`;
+      if (entry.isFile() && posix.matchesGlob(path, plain)) return true;
+      if (entry.isDirectory() && isWalked(entry)) folders.push(path);
+    }
+  }
+  return false;
 };
 
 /** Whether a configuration's list has something in it. */
