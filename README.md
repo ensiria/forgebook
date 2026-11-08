@@ -38,6 +38,7 @@ Requirements: Node 22.18 or later (Vite 8 comes with it, beside any Vite the pro
 Angular 20 to 22 or no framework, Next.js 15 and 16 through `@forgebook/nextjs`, Nuxt 3 or 4 through `@forgebook/nuxt`,
 SvelteKit 2 or 3 through `@forgebook/sveltekit`, React Native through react-native-web. Which versions of each are
 tested, and with what result, including the next ones: [docs/compatibility.md](docs/compatibility.md), written by a
-weekly CI run. [MIT licence](LICENSE).
+weekly CI run. What each package installs, and what `npm audit` finds in it: [docs/dependencies.md](docs/dependencies.md),
+written by another. [MIT licence](LICENSE).
 
 Bugs, proposals and pull requests: [CONTRIBUTING.md](CONTRIBUTING.md). Security problems: [SECURITY.md](SECURITY.md).

@@ -1,19 +1,22 @@
 /**
- * The table's new version put up for review: a commit with the page and its report on the `compat/table` branch, made
- * through GitHub's API so GitHub signs it, and a pull request into develop opened when none is. Nothing reaches
- * develop without a person merging it, and nothing is force-pushed: a new commit goes on top of the branch.
+ * A generated page's new version put up for review: a commit with its files on a branch of its own, made through
+ * GitHub's API so GitHub signs it, and a pull request into the base opened when none is. Nothing reaches the base
+ * without a person merging it, and nothing is force-pushed: a new commit goes on top of the branch. The workflows that
+ * regenerate a page on a schedule (`compat`, `dependencies`) publish through it.
  *
  * @module
  */
 
-/** The branch the table's pull request comes from. */
-export const TABLE_BRANCH = "compat/table";
-
-/** The commit's subject, a conventional commit the repository's check accepts. */
-export const COMMIT_MESSAGE = "docs(compat): update the compatibility table";
+/** Where a page's pull request comes from and what its commit says. */
+export type ReviewTarget = {
+  /** The branch the pull request comes from, the page's own. */
+  readonly branch: string;
+  /** The commit's subject and the pull request's title: a conventional commit the repository's check accepts. */
+  readonly message: string;
+};
 
 /** A file to put on the branch: its path from the root and its content. */
-export type TableFile = {
+export type PageFile = {
   /** Its path from the repository's root, with forward slashes. */
   readonly path: string;
   /** Its whole text. */
@@ -94,26 +97,28 @@ export const fileOnBranch = async (
 };
 
 /**
- * Commits the files on the table's branch and opens its pull request, or updates both. With a pull request open, the
+ * Commits the files on the page's branch and opens its pull request, or updates both. With a pull request open, the
  * commit goes on top of its branch and its description is replaced; with none, the branch starts again from the base,
  * so a branch left by a merged or closed pull request brings none of its old commits. A commit that would change
  * nothing is not made. Resolves to the pull request's address.
  */
-export const publishTable = async (
+export const publishPage = async (
   access: GitHubAccess,
-  files: readonly TableFile[],
+  target: ReviewTarget,
+  files: readonly PageFile[],
   body: string
 ): Promise<string> => {
+  const { branch, message } = target;
   const owner = access.repository.split("/")[0] ?? "";
   const open = await call(
     access,
     "GET",
-    `/pulls?state=open&base=${encodeURIComponent(access.base)}&head=${encodeURIComponent(`${owner}:${TABLE_BRANCH}`)}`
+    `/pulls?state=open&base=${encodeURIComponent(access.base)}&head=${encodeURIComponent(`${owner}:${branch}`)}`
   );
   const [existing] = Array.isArray(open) ? open : [];
-  const branchRef = await call(access, "GET", `/git/ref/heads/${TABLE_BRANCH}`, undefined, true);
+  const branchRef = await call(access, "GET", `/git/ref/heads/${branch}`, undefined, true);
   if (existing === undefined && branchRef !== undefined)
-    await call(access, "DELETE", `/git/refs/heads/${TABLE_BRANCH}`);
+    await call(access, "DELETE", `/git/refs/heads/${branch}`);
   const isOnBranch = existing !== undefined && branchRef !== undefined;
   const parent = isOnBranch
     ? field(branchRef, ["object", "sha"])
@@ -127,13 +132,11 @@ export const publishTable = async (
     ["sha"]
   );
   if (tree !== parentTree) {
-    const commit = field(
-      await call(access, "POST", "/git/commits", { message: COMMIT_MESSAGE, tree, parents: [parent] }),
-      ["sha"]
-    );
-    if (isOnBranch)
-      await call(access, "PATCH", `/git/refs/heads/${TABLE_BRANCH}`, { sha: commit, force: false });
-    else await call(access, "POST", "/git/refs", { ref: `refs/heads/${TABLE_BRANCH}`, sha: commit });
+    const commit = field(await call(access, "POST", "/git/commits", { message, tree, parents: [parent] }), [
+      "sha"
+    ]);
+    if (isOnBranch) await call(access, "PATCH", `/git/refs/heads/${branch}`, { sha: commit, force: false });
+    else await call(access, "POST", "/git/refs", { ref: `refs/heads/${branch}`, sha: commit });
   }
 
   if (existing !== undefined) {
@@ -141,8 +144,8 @@ export const publishTable = async (
     return field(existing, ["html_url"]);
   }
   const created = await call(access, "POST", "/pulls", {
-    title: COMMIT_MESSAGE,
-    head: TABLE_BRANCH,
+    title: message,
+    head: branch,
     base: access.base,
     body
   });
