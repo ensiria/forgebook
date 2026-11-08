@@ -60,28 +60,26 @@ import {
 import { CONFIG_ID, DOCS_PAGES_PREFIX, patternId, TOKENS_ID, virtualId } from "./pluginIds.ts";
 import {
   docsModule,
+  docsModuleOf,
   docsValue,
   FILES_PREFIX,
   invalidateEverywhere,
+  keptListing,
   listingRenewals,
+  pagesReloaded,
   patternModule,
   REACH_ID_PREFIX,
   reachModule,
+  type ServedListings,
   searchIndexes,
   USAGE_ID_PREFIX,
   usageModule
 } from "./pluginModules.ts";
 import { checkAtStart } from "./runningVersions.ts";
 import { scriptProblems } from "./scriptProblems.ts";
-import {
-  type IndexedStoryFile,
-  type IsFileKept,
-  isKeptIndex,
-  type KeptIndex,
-  storyFilesGroupOf
-} from "./storyFilesModule.ts";
+import { type IndexedStoryFile, isKeptIndex, type KeptIndex } from "./storyFilesModule.ts";
 import { tokensModule } from "./storylessRoutes.ts";
-import { DOCS_PAGE_QUERY, DOCS_QUERY, HOME_QUERY, RENEWED_QUERIES, TEXT_QUERIES } from "./textQueries.ts";
+import { DOCS_QUERY, RENEWED_QUERIES, TEXT_QUERIES } from "./textQueries.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
 /** This module's folder, in the core's package: the core's own dependencies resolve from here, not the project's. */
@@ -133,37 +131,6 @@ const requestedPage = (url: string): PageFile | undefined => {
 };
 
 /**
- * A docs pages' module, when the id is a pattern's, a page's or the written home's. The Markdown reader loads with the
- * first: a catalogue may have no docs pages, and a story's page reads none.
- *
- * @param id - the module's id.
- * @param watch - adds a file whose edit renews the module.
- * @param isServing - whether a dev server runs.
- * @param plugins - the catalogue's plugins, whose fences a page may draw.
- * @param isKept - whether a page its group lists may be read.
- */
-const docsModuleOf = async (
-  id: string,
-  watch: (file: string) => void,
-  isServing: boolean,
-  plugins: ResolvedConfig["plugins"],
-  isKept: IsFileKept
-): Promise<{ code: string; moduleType: "js" } | undefined> => {
-  const isHome = id.endsWith(HOME_QUERY);
-  const isPage = id.endsWith(DOCS_PAGE_QUERY);
-  if (!isHome && !isPage && !id.startsWith(DOCS_PAGES_PREFIX)) return undefined;
-  const { docPageModule, docPagesModule, homeModule } = await import("./docPagesModule.ts");
-  if (isHome)
-    return { code: homeModule(id.slice(0, -HOME_QUERY.length), watch, isServing, plugins), moduleType: "js" };
-  if (isPage) {
-    const file = id.slice(0, -DOCS_PAGE_QUERY.length);
-    return { code: docPageModule(file, watch, isServing, plugins), moduleType: "js" };
-  }
-  const { root, patterns } = storyFilesGroupOf(id.slice(DOCS_PAGES_PREFIX.length));
-  return { code: docPagesModule(root, patterns, watch, isServing, plugins, isKept), moduleType: "js" };
-};
-
-/**
  * The catalogue's Vite plugin: the story index, the docs, the code and the Markdown of the stories, the forced-states
  * rewrite of every style sheet and, with a configuration, the catalogue's two pages.
  *
@@ -173,10 +140,10 @@ const docsModuleOf = async (
  */
 export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin => {
   /**
-   * The modules of the groups of story files, with the files each listed when served (none while it could not be
-   * made), renewed when a story file is added to or removed from what one lists.
+   * The modules of the groups of story files, with the versions served since the pages last reloaded (none while it
+   * could not be made), renewed when a story file is added to or removed from what a page may hold.
    */
-  const filesModules = new Map<string, ReadonlySet<string> | undefined>();
+  const filesModules = new Map<string, ServedListings | undefined>();
   // what each pattern's module was served with: an edit of a story file that changes its list reloads the pages
   const served = servedPatterns();
   /** The groups' "Used in" modules, renewed when a source file changes: any edit may change what reaches what. */
@@ -313,23 +280,23 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         : { code: "export default [];", moduleType: "js" };
     }
     if (!id.startsWith(FILES_PREFIX)) return undefined;
-    filesModules.set(id, undefined);
     const lists = config?.lists ?? {};
     const hasUsage = offersUsedIn(lists);
     // the worker starts while Vite loads the pages, unless the disk keeps the docs; a test run asks for no page
-    const { files, refused, code } = patternModule(
-      id,
-      watch,
-      { hasDocs: readsComponentDocs(lists), hasUsage, hasReach: hasUsage && isServing() },
-      indexCache(),
-      isTestRun ? undefined : extractor().warm,
-      startTexts,
-      access.isKept,
-      isForgiving(),
-      config,
-      scripts.list()
+    const { files, refused, code } = keptListing(filesModules, id, () =>
+      patternModule(
+        id,
+        watch,
+        { hasDocs: readsComponentDocs(lists), hasUsage, hasReach: hasUsage && isServing() },
+        indexCache(),
+        isTestRun ? undefined : extractor().warm,
+        startTexts,
+        access.isKept,
+        isForgiving(),
+        config,
+        scripts.list()
+      )
     );
-    filesModules.set(id, new Set([...files, ...refused].map((file) => file.file)));
     if (!isRedrawing()) return { code, moduleType: "js" };
     served.keep(id, { files, refused });
     return { code: `${code}\n${filesModuleHot(refused)}`, moduleType: "js" };
@@ -527,6 +494,7 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
         if (renewed === undefined) return;
         invalidateEverywhere(server, renewed);
         server.ws.send({ type: "full-reload" });
+        pagesReloaded(filesModules);
       };
       server.watcher.on("add", refresh);
       server.watcher.on("unlink", refresh);

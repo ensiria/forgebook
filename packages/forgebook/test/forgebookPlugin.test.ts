@@ -304,8 +304,27 @@ describe("forgebookPlugin in the dev server", () => {
     hooks.configureServer(fake.server);
     renameSync(join(dir, "src", "Old.stories.tsx"), join(dir, "src", "New.stories.tsx"));
     fake.emit("unlink", join(dir, "src", "Old.stories.tsx"));
+    // the pages reload, and load the list after the rename: the new file needs no reload of its own
     fake.emit("add", join(dir, "src", "New.stories.tsx"));
     expect(fake.added).toEqual([]);
+    expect(fake.invalidated).toEqual([id]);
+    expect(fake.reloads).toBe(1);
+  });
+
+  it("reloads again for a file added after a page loaded the list without it, since the last reload", async () => {
+    const dir = storyFolder(["src/Old.stories.tsx"]);
+    const fake = fakeServer();
+    const hooks = hooksOf(forgebookPlugin({ framework: STUB_FRAMEWORK }));
+    const id = String(hooks.resolveId("./src/*.stories.tsx?forgebook-files", join(dir, "stories.ts")));
+    await hooks.load(id);
+    await hooks.closeBundle();
+    hooks.configureServer(fake.server);
+    rmSync(join(dir, "src", "Old.stories.tsx"));
+    fake.emit("unlink", join(dir, "src", "Old.stories.tsx"));
+    // a page loads the list between the removal and the next file, which it does not hold
+    await hooks.load(id);
+    writeStory(dir, "src/New.stories.tsx");
+    fake.emit("add", join(dir, "src", "New.stories.tsx"));
     expect(fake.invalidated).toEqual([id, id]);
     expect(fake.reloads).toBe(2);
   });

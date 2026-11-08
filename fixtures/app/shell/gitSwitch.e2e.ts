@@ -135,6 +135,21 @@ const STORIES = {
   other: "stories:forms-field--empty stories:inputs-button--secondary"
 } as const;
 
+/**
+ * Opens a story's address. A switch's reloads may still arrive as the page goes to it: one replaces the navigation and
+ * the page reloads where it was, so the address is asked for again, as a reader would.
+ */
+const openStory = async (page: Page, address: string): Promise<void> => {
+  for (;;) {
+    try {
+      await page.goto(address);
+      return;
+    } catch (error) {
+      if (!/ERR_ABORTED|interrupted by another navigation/.test(String(error))) throw error;
+    }
+  }
+};
+
 /** What the open story's frame says. */
 const said = (page: Page): Locator => page.frameLocator("iframe.forgebook-frame-view").getByTestId("said");
 
@@ -169,6 +184,8 @@ test.describe("git switch with forgebook dev running", () => {
       await new Promise((resolve) => {
         stopping.once("exit", resolve);
         stopping.kill();
+        // a server busy on a loaded machine may take longer to stop than the hook may wait: it is stopped for good
+        setTimeout(() => stopping.kill("SIGKILL"), 5_000).unref();
       });
     }
     rmSync(repo, { recursive: true, force: true });
@@ -178,30 +195,34 @@ test.describe("git switch with forgebook dev running", () => {
     const git = (...args: readonly string[]): void => {
       execFileSync("git", args, { cwd: repo });
     };
-    await page.goto(`${origin}/?story=stories:inputs-button--primary`);
+    await openStory(page, `${origin}/?story=stories:inputs-button--primary`);
     await expect(said(page)).toHaveText("main button", { timeout: 90_000 });
     const sidebar = page.getByRole("navigation").first();
     await expectGroups(sidebar, "Layout", "Forms");
 
+    // the agents' API reads the lists as soon as the branch is switched, before the page hears of it: an agent asking
+    // must not leave the page holding the branch before
     for (let round = 0; round < 3; round += 1) {
       git("switch", "-q", "other");
+      await expect.poll(() => listedStories(origin), { timeout: 20_000 }).toBe(STORIES.other);
       await expectGroups(sidebar, "Forms", "Layout");
       git("switch", "-q", "main");
+      await expect.poll(() => listedStories(origin), { timeout: 20_000 }).toBe(STORIES.main);
       await expectGroups(sidebar, "Layout", "Forms");
     }
 
     git("switch", "-q", "other");
     await expectGroups(sidebar, "Forms", "Layout");
     await expect.poll(() => listedStories(origin), { timeout: 20_000 }).toBe(STORIES.other);
-    await page.goto(`${origin}/?story=stories:inputs-button--secondary`);
+    await openStory(page, `${origin}/?story=stories:inputs-button--secondary`);
     await expect(said(page)).toHaveText("other button", { timeout: 30_000 });
-    await page.goto(`${origin}/?story=stories:forms-field--empty`);
+    await openStory(page, `${origin}/?story=stories:forms-field--empty`);
     await expect(said(page)).toHaveText("field", { timeout: 30_000 });
 
     git("switch", "-q", "main");
     await expectGroups(sidebar, "Layout", "Forms");
     await expect.poll(() => listedStories(origin), { timeout: 20_000 }).toBe(STORIES.main);
-    await page.goto(`${origin}/?story=stories:inputs-button--primary`);
+    await openStory(page, `${origin}/?story=stories:inputs-button--primary`);
     await expect(said(page)).toHaveText("main button", { timeout: 30_000 });
 
     const button = join(repo, "src", "Button.stories.ts");
