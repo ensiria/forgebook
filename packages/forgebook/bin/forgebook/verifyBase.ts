@@ -21,7 +21,7 @@ import { basename, dirname, join, relative, sep } from "node:path";
 import type { StoryCheckReport, StoryCheckResult, StoryProblem } from "../../src/storyCheck.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { findConfigFile } from "../../src/vite/configFile.ts";
-import { gitOutput } from "../../src/vite/gitChange.ts";
+import { gitOutput, gitOutputIn } from "../../src/vite/gitChange.ts";
 import { configOf } from "./catalogueCommands.ts";
 import { isProcessRunning } from "./commandCacheClaim.ts";
 import { runStoriesCheck } from "./storyCheckRun.ts";
@@ -82,15 +82,28 @@ const twinModules = (from: string, to: string, root: string, folder: string): vo
 /** The prefix of the folders a base runs in, beside the repository. */
 const folderPrefix = (root: string): string => `.${basename(root)}-forgebook-base-`;
 
+/**
+ * The environment of the git commands that make, remove and prune the base's worktree: without `GIT_INDEX_FILE`, which
+ * git sets for its hooks. A pre-commit hook that runs `verify` would otherwise have the base's checkout written into the
+ * index of the commit being made: a relative one fails the checkout, and an absolute one (`git commit -a`) turns the
+ * commit into the base's files.
+ *
+ * @param env - the run's environment.
+ */
+const worktreeEnv = (
+  env: Readonly<Record<string, string | undefined>>
+): Readonly<Record<string, string | undefined>> =>
+  Object.fromEntries(Object.entries(env).filter(([name]) => name !== "GIT_INDEX_FILE"));
+
 /** Removes the base folders a run that is gone left beside the repository, and git's record of them. */
-const sweep = async (root: string): Promise<void> => {
+const sweep = async (root: string, env: Readonly<Record<string, string | undefined>>): Promise<void> => {
   const prefix = folderPrefix(root);
   for (const name of readdirSync(dirname(root)).filter((each) => each.startsWith(prefix))) {
     const pid = Number(name.split("-").pop());
     if (Number.isInteger(pid) && !isProcessRunning(pid))
       rmSync(join(dirname(root), name), { recursive: true, force: true });
   }
-  await gitOutput(root, "worktree", "prune").catch(() => undefined);
+  await gitOutputIn(root, env, "worktree", "prune").catch(() => undefined);
 };
 
 /** Positions, query stamps and addresses: what differs between two runs of the same code. */
@@ -188,19 +201,22 @@ export type BaseRun =
  * @param base - the base commit, as `git merge-base` gave it.
  * @param ids - the stories to run.
  * @param isAllVariants - whether every variant runs, as on the change.
+ * @param runEnv - the run's environment.
  */
 export const runOnBase = async (
   config: ResolvedConfig,
   base: string,
   ids: readonly string[],
-  isAllVariants: boolean
+  isAllVariants: boolean,
+  runEnv: Readonly<Record<string, string | undefined>>
 ): Promise<BaseRun> => {
+  const env = worktreeEnv(runEnv);
   const root = (await gitOutput(config.dir, "rev-parse", "--show-toplevel")).trim();
   const folder = join(dirname(root), `${folderPrefix(root)}${base.slice(0, 12)}-${process.pid}`);
   const twins: string[] = [];
   try {
-    await sweep(root);
-    await gitOutput(root, "worktree", "add", "--detach", "--force", folder, base);
+    await sweep(root, env);
+    await gitOutputIn(root, env, "worktree", "add", "--detach", "--force", folder, base);
     for (const each of modulesFolders(root)) {
       const twin = join(folder, each, "node_modules");
       if (!existsSync(join(folder, each)) || existsSync(twin)) continue;
@@ -216,7 +232,7 @@ export const runOnBase = async (
   } finally {
     // the links go first, so nothing that removes the worktree can follow one into the working tree
     for (const twin of twins) rmSync(twin, { recursive: true, force: true });
-    await gitOutput(root, "worktree", "remove", "--force", folder).catch(() => undefined);
+    await gitOutputIn(root, env, "worktree", "remove", "--force", folder).catch(() => undefined);
     rmSync(folder, { recursive: true, force: true });
   }
 };
