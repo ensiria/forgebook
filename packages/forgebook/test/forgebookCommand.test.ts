@@ -141,6 +141,15 @@ describe("a configuration that cannot be used", () => {
   );
 });
 
+describe("forgebook --version", () => {
+  it("prints the package's version and exits 0, which the commit hook init --agents writes asks first", () => {
+    const run = spawnSync(process.execPath, [ENTRY, "--version"], { encoding: "utf8" });
+    const { version } = JSON.parse(readFileSync(join(import.meta.dirname, "..", "package.json"), "utf8"));
+    expect(run.status).toBe(0);
+    expect(run.stdout).toBe(`${version}\n`);
+  });
+});
+
 describe("forgebook verify with a story pattern that matches nothing", () => {
   it(
     "answers not verified, naming the pattern, and still gives the rest of its answer",
