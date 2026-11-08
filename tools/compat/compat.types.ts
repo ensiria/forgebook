@@ -49,6 +49,11 @@ export type AdapterHost = {
   readonly host: string;
   /** Where the claimed range comes from, over the tool's own default. */
   readonly range?: RangeSource;
+  /**
+   * A fixture catalogue for a line of the tool, by line, over the package's own: for a line the package's fixture is
+   * not written for and the tool itself refuses (a SvelteKit 3 app run on SvelteKit 2).
+   */
+  readonly fixtures?: Readonly<Record<string, string>>;
 };
 
 /** A published package and the fixture catalogue that exercises it. */

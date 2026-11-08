@@ -13,7 +13,7 @@ import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 
 import type { CellCommand, CellResult, CompatMatrix, PlannedCell } from "./compat.types.ts";
 import { parseManifest } from "./documents.ts";
-import { cellCommands, hostOf } from "./plan.ts";
+import { cellCommands, cellFixture, hostOf } from "./plan.ts";
 
 /** How long one command may run before it is stopped: a fixture's build is about a minute on a runner. */
 const COMMAND_TIMEOUT_MS = 20 * 60_000;
@@ -139,7 +139,8 @@ export const runCell = async (
     return notRun("the install failed");
   }
 
-  const folders = [join(root, adapter.folder), join(root, adapter.fixture)];
+  const fixture = cellFixture(adapter, cell);
+  const folders = [join(root, adapter.folder), join(root, fixture)];
   const installed = Object.fromEntries(
     Object.keys(asked).flatMap((name) => {
       const version = installedVersion(name, folders);
@@ -154,10 +155,7 @@ export const runCell = async (
     readFileSync(join(root, adapter.folder, "package.json"), "utf8"),
     adapter.folder
   );
-  const fixtureManifest = parseManifest(
-    readFileSync(join(root, adapter.fixture, "package.json"), "utf8"),
-    adapter.fixture
-  );
+  const fixtureManifest = parseManifest(readFileSync(join(root, fixture, "package.json"), "utf8"), fixture);
   const planned = cellCommands(adapterManifest, fixtureManifest);
   if (planned.length === 0)
     return notRun("the package and its fixture have no test or build to run", installed);

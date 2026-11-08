@@ -83,6 +83,15 @@ export const hostOf = (matrix: CompatMatrix, key: string): HostDefinition => {
   return host;
 };
 
+/**
+ * The fixture catalogue a cell runs: its line's own when the package names one for that tool, else the package's.
+ *
+ * @param adapter - the package.
+ * @param cell - the cell, by its tool and line.
+ */
+export const cellFixture = (adapter: AdapterDefinition, cell: Pick<PlannedCell, "host" | "line">): string =>
+  adapter.hosts.find((entry) => entry.host === cell.host)?.fixtures?.[cell.line] ?? adapter.fixture;
+
 /** The first npm package of a tool: the one whose versions and dist-tags are read. */
 export const primaryPackage = (host: HostDefinition): string => {
   const [first] = host.packages;

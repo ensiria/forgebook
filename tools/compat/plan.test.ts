@@ -14,6 +14,7 @@ import { parseManifest } from "./documents.ts";
 import { COMPAT_MATRIX } from "./matrix.ts";
 import {
   cellCommands,
+  cellFixture,
   claimedRange,
   companionVersion,
   hostOf,
@@ -226,6 +227,22 @@ describe("cellCommands", () => {
   });
 });
 
+describe("cellFixture", () => {
+  const adapter = {
+    name: "@x/kit",
+    folder: "packages/kit",
+    fixture: "fixtures/kit3",
+    hosts: [{ host: "kit", fixtures: { "2": "fixtures/kit2" } }, { host: "vite" }]
+  };
+
+  it("runs a line on its own fixture when the package names one, and every other cell on the package's", () => {
+    expect(cellFixture(adapter, { host: "kit", line: "2" })).toBe("fixtures/kit2");
+    expect(cellFixture(adapter, { host: "kit", line: "3" })).toBe("fixtures/kit3");
+    expect(cellFixture(adapter, { host: "kit", line: "next" })).toBe("fixtures/kit3");
+    expect(cellFixture(adapter, { host: "vite", line: "2" })).toBe("fixtures/kit3");
+  });
+});
+
 describe("the repository's matrix", () => {
   const root = resolve(import.meta.dirname, "../..");
   const readReal = (folder: string): Manifest =>
@@ -236,10 +253,21 @@ describe("the repository's matrix", () => {
       expect(readReal(adapter.folder).name).toBe(adapter.name);
       expect(existsSync(join(root, adapter.fixture, "package.json"))).toBe(true);
       expect("build" in readReal(adapter.fixture).scripts).toBe(true);
-      for (const entry of adapter.hosts)
+      for (const entry of adapter.hosts) {
         expect(claimedRange(adapter, entry, hostOf(COMPAT_MATRIX, entry.host), readReal)).not.toBe("");
+        for (const fixture of Object.values(entry.fixtures ?? {}))
+          expect("build" in readReal(fixture).scripts, fixture).toBe(true);
+      }
     }
     expect(packagesToRead(COMPAT_MATRIX)).toContain("vite");
+  });
+
+  it("runs SvelteKit 2 on a SvelteKit 2 app, and SvelteKit 3 on the package's own", () => {
+    const kit = COMPAT_MATRIX.adapters.find((adapter) => adapter.name === "@forgebook/sveltekit");
+    if (kit === undefined) throw new Error("the matrix tests the SvelteKit package");
+    expect(cellFixture(kit, { host: "sveltekit", line: "2" })).toBe("fixtures/sveltekit2");
+    expect(cellFixture(kit, { host: "sveltekit", line: "3" })).toBe("fixtures/sveltekit");
+    expect(readReal("fixtures/sveltekit2").name).toBe("@fixture/sveltekit2");
   });
 
   it("covers every published package that draws stories", () => {
