@@ -1,0 +1,29 @@
+// A composed catalogue's story (`RefStoryPage.tsx`), loaded with it, so a catalogue that composes none carries none of
+// it: the other catalogue's embed page under the header, as wide as the workspace and as tall as the story it reports.
+
+@use "../styles/tokens" as *;
+
+@layer catalogue {
+  .forgebook-ref-story {
+    overflow: auto;
+  }
+
+  .forgebook-ref-story__note {
+    margin: $space-1 0 0;
+    font: $text-caption;
+    color: $text-secondary;
+  }
+
+  .forgebook-ref-story__stage {
+    padding: $space-4;
+  }
+
+  .forgebook-ref-story__frame {
+    display: block;
+    width: 100%;
+    border: 0;
+    border-radius: $radius-card;
+    box-shadow: $shadow-card;
+    background: $surface;
+  }
+}

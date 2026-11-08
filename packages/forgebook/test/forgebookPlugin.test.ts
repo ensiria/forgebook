@@ -210,6 +210,7 @@ describe("forgebookPlugin's pages", () => {
     hasPlayTools: false,
     frames: ISOLATED_FRAMES,
     build: { readableNames: false },
+    refs: [],
     appBuild: resolvedAppBuild(false)
   };
 

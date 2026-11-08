@@ -12,7 +12,8 @@ import type { ScriptIo } from "@ensiria/cli-kit/io.types";
 import type { Logger } from "@ensiria/cli-kit/log.types";
 import { ScriptError } from "@ensiria/cli-kit/script";
 
-import { AGENT_INDEX_FILE, indexProblems, isAgentIndex } from "../../src/vite/agentIndex.ts";
+import { AGENT_INDEX_FILE } from "../../src/agentIndexFile.ts";
+import { indexProblems, isAgentIndex } from "../../src/vite/agentIndex.ts";
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { answerMcpMessage, type McpServer, NEW_SESSION } from "../../src/vite/mcpProtocol.ts";
 import { pluginsDocument } from "../../src/vite/pluginConfig.ts";

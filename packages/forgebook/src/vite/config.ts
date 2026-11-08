@@ -116,6 +116,22 @@ export type ForgebookConfig = CatalogueLists & {
    * and each part can be turned off.
    */
   readonly appBuild?: AppBuildOption;
+  /**
+   * Other catalogues, built and deployed, shown in the sidebar after this one's stories, by an id of lower-case words
+   * (`{ "design-system": { title: "Design system", url: "https://ds.example.com/" } }`). Each is read from the index
+   * its `forgebook build --agent-index` writes, when its section is first opened, and its stories are drawn by its own
+   * page on its own origin, read-only, with this catalogue's switches. Its host must let this catalogue fetch the index
+   * (CORS) and frame its page. None by default.
+   */
+  readonly refs?: Readonly<Record<string, RefOption>>;
+};
+
+/** A catalogue shown in another's sidebar (`refs`). */
+export type RefOption = {
+  /** Its name, as its section's heading. */
+  readonly title: string;
+  /** The address it is served at, its folder (`https://ds.example.com/catalogue/`). */
+  readonly url: string;
 };
 
 /** How `forgebook build` writes the catalogue. */

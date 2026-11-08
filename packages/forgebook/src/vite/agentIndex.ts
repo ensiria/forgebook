@@ -20,9 +20,6 @@ import type { AgentAnswer } from "./agentRoutes.ts";
 import { type FindableComponent, findComponents } from "./findComponent.ts";
 import { TOKEN_ANSWERS, type TokenReading } from "./tokenAnswers.ts";
 
-/** The file's name in the built catalogue. */
-export const AGENT_INDEX_FILE = "forgebook-agent.json";
-
 /** A component as a search finds it, with what its answer carries. */
 export type IndexedComponent = FindableComponent & {
   /** Its first story's id. */

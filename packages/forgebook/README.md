@@ -1214,6 +1214,41 @@ A monorepo that points its packages at their sources with an export condition (`
 `forgebook` command: its dev server reads the stories and previews it answers tools with on Node under the same
 conditions, those of other runtimes (`browser`) aside, unless a plugin names the server's own.
 
+## Other catalogues, already published
+
+A catalogue can list another one, built and deployed elsewhere, after its own stories: a product's catalogue showing the
+design system it uses, from the design system's own site. Each is named in `refs`, by an id of lower-case words:
+
+```ts
+export default defineConfig({
+  framework: react(),
+  title: "Checkout",
+  stories: ["src/**/*.stories.tsx"],
+  refs: {
+    "design-system": { title: "Acme design system", url: "https://design.acme.dev/" }
+  }
+});
+```
+
+- **What the other catalogue needs.** It is built with `forgebook build --agent-index`, so `forgebook-agent.json` sits
+  beside its pages, and its host lets this catalogue fetch that file (an `Access-Control-Allow-Origin` header) and frame
+  its page (no `frame-ancestors` that leaves this catalogue out). Without the index its section says so, and why.
+- **Lazy.** Its section starts shut, and its index is fetched only when it is first opened, or when an address shows one
+  of its stories. A catalogue without `refs` loads none of this code.
+- **Read-only, on its own origin.** A story is drawn by the other catalogue's own embed page (`?embed`), with its own
+  preview and theme, in a frame on its origin, sandboxed as a story's frame is and given only the browser features that
+  ask the reader nothing (full screen, video, writing to the clipboard). Nothing it runs reaches this page, and this page
+  sends it nothing but an address: its controls, panel and docs are in its own page, one click away (*Open in …*). One
+  served on the origin this catalogue's stories run on is refused.
+- **The toolbar's switches cross.** Every switch of this catalogue goes in the address, its value included when it is
+  the default; the other catalogue keeps those it declares, with values it knows (the theme of both, say), and drops the
+  rest. The width, the device and the panel's values do not cross.
+- **The address** of one of its stories is `?ref=<id>&story=<its id>`, so it can be shared like any other; a `ref` that
+  names none of them (`?ref=newsletter`, another site's mark) leaves the story this catalogue's. No switch may be named
+  `ref`.
+- **Not searched.** The search and the tag filter read this catalogue only: searching another would fetch its whole index
+  at the first key. Agents read a published catalogue on its own with `forgebook mcp --from <its address>`.
+
 ## A lighter catalogue
 
 Two features cost the most and are on by default: the accessibility check, which ships axe (about 180 KB gzipped in a

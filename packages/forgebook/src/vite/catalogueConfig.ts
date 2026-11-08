@@ -11,6 +11,7 @@ import type { UserConfig } from "vite";
 import { packageResolver, type ResolvedConfig } from "./configFile.ts";
 import { pageModulePath } from "./pages.ts";
 import { prebundled, type ScanFindings, scannedEntries, scanOptions } from "./prebundled.ts";
+import { refsDefine } from "./refsConfig.ts";
 
 /**
  * A file's text, or none when it cannot be read.
@@ -51,6 +52,8 @@ export const catalogueConfig = (
   // a hoisted workspace can keep a package's React in its folder while the adapter, at the root, reads another copy, and
   // every component then fails with "invalid hook call": the catalogue's folder decides
   resolve: { dedupe: ["react", "react-dom"] },
+  // a catalogue that composes no other has every part of composition removed from its shell (`shell/composition.ts`)
+  define: refsDefine(config.refs),
   // the pages are generated, so Vite's scanner cannot find what they import: it is named here, and the
   // story files (the project's and the sources') are scanned for what their components import
   optimizeDeps: {

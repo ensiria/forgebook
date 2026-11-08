@@ -21,6 +21,7 @@ import { STORY_FILE } from "./autoTitle.ts";
 import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 import { hasPluginViews, PLUGIN_HOSTS_MODULE, WRITTEN_HOME_MODULE } from "./pages.ts";
 import { pluginModules } from "./pluginConfig.ts";
+import { REFS_MODULE } from "./refsConfig.ts";
 import { INSTALLED, parsedScript, SCRIPT, type ScriptProblems } from "./scriptProblems.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
@@ -57,6 +58,7 @@ export const prebundled = (config: ResolvedConfig, resolve: Resolve): string[] =
     // imported on first use, so the scanner never sees it: named, or the first home would wait for the optimizer
     ...(config.home === undefined ? [] : [WRITTEN_HOME_MODULE]),
     ...(hasPluginViews(config) ? [PLUGIN_HOSTS_MODULE] : []),
+    ...(config.refs.length === 0 ? [] : [REFS_MODULE]),
     config.framework.pages.frame,
     config.framework.pages.code,
     ...pluginModules(config.plugins, config.framework.name)

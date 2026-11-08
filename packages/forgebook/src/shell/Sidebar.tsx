@@ -6,7 +6,8 @@
  * component by its
  * name, its place, its meta's search words or its stories' names and descriptions. A component listed in other places too (`alsoIn`) has an
  * alias entry in each, beside the components that live there, which says where it lives and opens its page. Docs pages
- * come first, in a section of their own (`SidebarDocs.tsx`).
+ * come first, in a section of their own (`SidebarDocs.tsx`); other catalogues composed with `refs` come last
+ * (`SidebarRefs.tsx`).
  *
  * @module
  */
@@ -27,6 +28,7 @@ import type { SearchTarget } from "../search.ts";
 import { hasFilterTags } from "../storyTagNames.ts";
 import type { StoryTree, TreeFamily, TreeGroup, TreeSource } from "../storyTree.ts";
 import { AppearanceMenu } from "./AppearanceMenu.tsx";
+import { HAS_REFS } from "./composition.ts";
 import { FORGEBOOK_MARK_URL } from "./forgebookMark.ts";
 import { Icon } from "./icons.tsx";
 import { LazyView, lazyModule } from "./lazyModule.tsx";
@@ -119,6 +121,8 @@ export type SidebarProps = SidebarPageLinks & {
   readonly appearance: AppearanceState;
   /** Opens the list of the shell's keys. */
   readonly onShowKeys: () => void;
+  /** What is listed after this catalogue's stories when no search or tag narrows them: the composed catalogues. */
+  readonly composed?: ReactNode;
 };
 
 /** A family's key, unique across sources. */
@@ -391,7 +395,7 @@ export const Sidebar = ({
   ...links
 }: SidebarProps): ReactNode => {
   const [query, setQuery] = useState("");
-  const [filterTree, setFilterTree] = useState<typeof shownTree>();
+  const [filterTree, setFilterTree] = useState<typeof shownTree>(() => unsearchedTree);
   const showFiltered = useCallback((filter: typeof shownTree): void => setFilterTree(() => filter), []);
   const navRef = useRef<HTMLElement>(null);
   // the shown component stays in sight: a page opened by a key, the picker or the address scrolls the list to it
@@ -409,8 +413,7 @@ export const Sidebar = ({
   const isNarrowed = isSearching || isFiltered;
 
   // the filter comes with the search's list; a moment before it, or with no words, the tree shows whole
-  const { sources, pages } =
-    isSearching && filterTree !== undefined ? filterTree(tree, query) : unsearchedTree(tree);
+  const { sources, pages } = isSearching ? filterTree(tree, query) : unsearchedTree(tree);
   const hasMatches = pages.length > 0 || sources.some(({ families }) => families.length > 0);
 
   return (
@@ -481,6 +484,8 @@ export const Sidebar = ({
             links={links}
           />
         ))}
+        {/* the search and the tag filter read this catalogue only: another's list is not fetched to search it */}
+        {HAS_REFS && !isNarrowed ? links.composed : null}
       </nav>
       <AppearanceMenu {...appearance} onShowKeys={onShowKeys} />
       {isOpen && !isOverlay ? <SidebarHandle width={width} onWidthChange={onWidthChange} /> : null}

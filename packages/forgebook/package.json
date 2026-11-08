@@ -40,6 +40,7 @@
     "./shell": "./src/shell/mountShell.tsx",
     "./shell/home": "./src/shell/AuthoredHome.tsx",
     "./shell/plugin-hosts": "./src/shell/pluginHosts.ts",
+    "./shell/refs": "./src/shell/refParts.tsx",
     "./frame": "./src/frame/mountFrame.ts",
     "./vite": "./src/vite/forgebookPlugin.ts",
     "./renderer": "./src/frame/renderer.ts",
@@ -168,6 +169,10 @@
       "./shell/plugin-hosts": {
         "types": "./dist/src/shell/pluginHosts.d.ts",
         "default": "./dist/src/shell/pluginHosts.js"
+      },
+      "./shell/refs": {
+        "types": "./dist/src/shell/refParts.d.ts",
+        "default": "./dist/src/shell/refParts.js"
       },
       "./frame": {
         "types": "./dist/src/frame/mountFrame.d.ts",

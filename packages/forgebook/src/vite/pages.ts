@@ -21,6 +21,7 @@ import type { PageConfig } from "../pageConfig.ts";
 import type { ViewSwitch } from "../switches.ts";
 import { PLAY_TOOLS_PACKAGES, type ResolvedConfig } from "./configFile.ts";
 import { pluginFrameModule } from "./pluginConfig.ts";
+import { refsLines } from "./refsConfig.ts";
 import {
   DOCS_PAGES_SPECIFIER_PREFIX,
   FILES_SPECIFIER_PREFIX,
@@ -462,6 +463,7 @@ export const shellEntry = (config: ResolvedConfig): string => {
     "    languages: config.languages,",
     ...(config.switches === undefined ? [] : ["    switches: config.switches,"]),
     "    lists: config.lists,",
+    ...refsLines(config),
     ...pluginViewLines(config),
     ...argControlLines(config),
     ...(config.framework.addressTexts === undefined

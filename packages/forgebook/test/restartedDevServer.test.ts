@@ -65,6 +65,7 @@ describe("a dev server's first clients", () => {
     hasPlayTools: false,
     frames: resolvedFrames("same-origin"),
     build: { readableNames: false },
+    refs: [],
     appBuild: resolvedAppBuild(false)
   });
 

@@ -56,7 +56,7 @@ const FRAME_PERMISSIONS = [
  * catalogue's, so the pair gives the story nothing of the catalogue's. Frames on the catalogue's own origin get none:
  * there the pair would let a story lift its own sandbox, and browsers warn of it.
  */
-const FRAME_SANDBOX = [
+export const FRAME_SANDBOX = [
   "allow-scripts",
   "allow-same-origin",
   "allow-forms",

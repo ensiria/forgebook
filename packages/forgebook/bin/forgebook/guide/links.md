@@ -23,3 +23,7 @@ or `@deprecated` (with `@replacedBy`) to the TSDoc, so the catalogue and `check-
 
 Each story also says whether a `play` function acts on it (`hasPlay`), and `tags` holds `!test` when the generated tests
 leave it out.
+
+A catalogue can list other published catalogues after its own stories (`refs` in its configuration). One of their stories
+opens at `?ref=<id>&story=<story id>`, drawn read-only by that catalogue's own page. This catalogue's tools do not list
+those stories: read the other catalogue with `forgebook mcp --from <its address>`.

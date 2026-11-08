@@ -51,6 +51,7 @@ import { parseView, type StageWidth, type ViewCatalogue, type ViewState, viewPar
 import type { WrittenHomeProps } from "./AuthoredHome.tsx";
 import type { ComponentPageProps } from "./ComponentPage.tsx";
 import { CatalogueContext, NO_PLUGINS, useCatalogue, useConfiguredCatalogue } from "./catalogueContext.ts";
+import { HAS_REFS, shellRefs } from "./composition.ts";
 import type { ArgControlLoaders } from "./customControls.ts";
 import type { DocPageProps } from "./DocPage.tsx";
 import { filesCodeLoader } from "./filesCode.ts";
@@ -61,8 +62,10 @@ import { LogicMark } from "./LogicMark.tsx";
 import { type LazyModule, lazyModule } from "./lazyModule.tsx";
 import { type LoadPluginHosts, PluginHostsContext } from "./pluginHostsContext.ts";
 import type { ShellPlugin } from "./pluginTabs.tsx";
+import type { RefPartProps, ShellRefs } from "./refParts.tsx";
 import { Sidebar, type SidebarProps } from "./Sidebar.tsx";
 import { SidebarShade } from "./SidebarHandle.tsx";
+import type { RefStoryPlace, SidebarRefsProps } from "./SidebarRefs.tsx";
 import { Stage } from "./Stage.tsx";
 import { StoryPicker } from "./StoryPicker.tsx";
 import type { TouchOverrides } from "./storyTouch.ts";
@@ -148,6 +151,12 @@ export type ShellConfig = {
    * texts that are not plain words from a story that may write them into markup. `any` by default.
    */
   readonly addressTexts?: AddressTexts;
+  /**
+   * Other catalogues, built and deployed, listed after this one's stories and shown read-only (`catalogueRefs.ts`), and
+   * the code that draws them (`forgebook/shell/refs`): the generated page gives them only for a catalogue that has some,
+   * so the others' first load carries none of it. None by default.
+   */
+  readonly refs?: ShellRefs;
 };
 
 /** A docs page, loaded on first use: a catalogue may have none. */
@@ -155,6 +164,26 @@ const DOC_PAGE = lazyModule<DocPageProps>(() => import("./DocPage.tsx").then((mo
 
 /** The home, loaded when it is opened. */
 const HOME_PAGE = lazyModule<HomePageProps>(() => import("./HomePage.tsx").then((module) => module.HomePage));
+
+/** The address's parameter that names a composed catalogue; its story is in `story`, as a story of this one's is. */
+const REF_PARAMETER = "ref";
+
+/**
+ * A part of the composed catalogues, once its module is there; nothing for a catalogue that composes none, or on a page
+ * that shows none of their stories.
+ *
+ * @param props - the module, if any, and the part's props; none when there is nothing to draw.
+ */
+const RefSlot = ({
+  refs,
+  part
+}: {
+  readonly refs: ShellRefs | undefined;
+  readonly part: RefPartProps | undefined;
+}): ReactNode =>
+  refs === undefined || part === undefined ? null : (
+    <LazyPage module={refsModuleOf(refs)} header={null} pageProps={part} />
+  );
 
 /** A component's page, loaded when one is opened. */
 const COMPONENT_PAGE = lazyModule<ComponentPageProps>(() =>
@@ -189,6 +218,7 @@ type Page =
   | { readonly kind: "story"; readonly id: string }
   | { readonly kind: "component"; readonly id: string; readonly anchor?: string | undefined }
   | { readonly kind: "page"; readonly id: string; readonly anchor?: string | undefined }
+  | { readonly kind: "ref"; readonly ref: string; readonly id: string; readonly anchor?: undefined }
   | { readonly kind: "home" };
 
 /** The home. */
@@ -197,6 +227,7 @@ const HOME: Page = { kind: "home" };
 /** A page's key: the same for every view of it. */
 const pageKey = (page: Page): string => {
   if (page.kind === "home") return page.kind;
+  if (HAS_REFS && page.kind === "ref") return `ref:${page.ref}/${page.id}`;
   // a heading is a place of its own in the history: Back from it returns to where the reader was
   return page.kind === "story" ? `story:${page.id}` : `${page.kind}:${page.id}#${page.anchor ?? ""}`;
 };
@@ -257,7 +288,8 @@ type Address = {
 };
 
 /**
- * The page an address's query and fragment name: a story wins, then a component, then a docs page; none is the home.
+ * The page an address's query and fragment name: a composed catalogue's story wins, then a story, a component, a docs
+ * page; none is the home.
  *
  * @param search - the address's query.
  * @param hash - its fragment.
@@ -267,6 +299,8 @@ const pageOf = (search: string, hash: string): Page => {
   const story = storyOfAddress(params);
   const component = params.get("component");
   const page = params.get("page");
+  const ref = HAS_REFS ? params.get(REF_PARAMETER) : null;
+  if (ref !== null && story !== null) return { kind: "ref", ref, id: story };
   if (story !== null) return { kind: "story", id: story };
   const anchor = anchorOf(hash.replace(/^#/, ""));
   if (component !== null) return { kind: "component", id: component, anchor };
@@ -296,6 +330,18 @@ const readAddress = (catalogue: ViewCatalogue, addressTexts: AddressTexts): Addr
 type AddressCatalogue = Pick<CatalogueSettings, "switches" | "audience" | "play">;
 
 /**
+ * Writes a composed catalogue's story into an address's parameters; nothing for another page.
+ *
+ * @param params - the parameters.
+ * @param page - the page.
+ */
+const writeRefPage = (params: URLSearchParams, page: Page): void => {
+  if (page.kind !== "ref") return;
+  params.set(REF_PARAMETER, page.ref);
+  params.set("story", page.id);
+};
+
+/**
  * The query of an address.
  *
  * @param address - the page, the view, the panel's values and the matrix's axes.
@@ -306,6 +352,7 @@ const addressQuery = (
   catalogue: AddressCatalogue
 ): string => {
   const params = viewParams(view, catalogue.switches, catalogue.audience, catalogue.play);
+  if (HAS_REFS) writeRefPage(params, page);
   if (page.kind === "story") params.set("story", page.id);
   if (page.kind === "component") params.set("component", page.id);
   if (page.kind === "page") params.set("page", page.id);
@@ -327,10 +374,36 @@ type Shown =
   | { readonly kind: "story"; readonly location: StoryLocation }
   | { readonly kind: "component"; readonly location: ComponentLocation; readonly anchor: string | undefined }
   | { readonly kind: "page"; readonly location: PageLocation; readonly anchor: string | undefined }
+  | { readonly kind: "ref"; readonly place: RefStoryPlace }
   | { readonly kind: "home" }
   | { readonly kind: "missing"; readonly message: string };
 
-/** What the address's page shows: a story or a component that is not there (renamed, removed) says so, never another. */
+/**
+ * What the address's page shows in a catalogue that composes others: a composed catalogue's story, or what `shownPage`
+ * said. A `ref` that names no composed catalogue is another site's mark (`?ref=newsletter`): the story is this
+ * catalogue's.
+ *
+ * @param tree - the tree.
+ * @param page - the address's page.
+ * @param refs - the composed catalogues, if any.
+ * @param shown - what `shownPage` said of it.
+ */
+const shownRef = (
+  tree: ReturnType<typeof storyTree>,
+  page: Page,
+  refs: ShellRefs | undefined,
+  shown: Shown
+): Shown => {
+  if (page.kind !== "ref") return shown;
+  return refs?.catalogues.some((each) => each.id === page.ref)
+    ? { kind: "ref", place: { refId: page.ref, storyId: page.id } }
+    : shownPage(tree, { kind: "story", id: page.id });
+};
+
+/**
+ * What the address's page shows: a story or a component that is not there (renamed, removed) says so, never another. A
+ * composed catalogue's story is `shownRef`'s.
+ */
 const shownPage = (tree: ReturnType<typeof storyTree>, page: Page): Shown => {
   if (page.kind === "story") {
     const location = findStory(tree, page.id);
@@ -375,6 +448,56 @@ const isLogicPage = (shown: Shown): boolean => {
 /** The shown component's place, a story's too; none on any other page. */
 const componentLocationOf = (shown: Shown): ComponentLocation | undefined =>
   shown.kind === "story" || shown.kind === "component" ? shown.location : undefined;
+
+/** The shown story of a composed catalogue; none on any other page. */
+const refPlaceOf = (shown: Shown): RefStoryPlace | undefined =>
+  shown.kind === "ref" ? shown.place : undefined;
+
+/** The page of a composed catalogue's story. */
+const refPageOf = ({ refId, storyId }: RefStoryPlace): Page => ({ kind: "ref", ref: refId, id: storyId });
+
+/** The composed catalogues' code, once a part of it was first drawn: a page holds one shell, with one configuration. */
+let refsModule: LazyModule<RefPartProps> | undefined;
+
+/** The composed catalogues' code, loaded when a part of it is first drawn. */
+const refsModuleOf = (refs: ShellRefs): LazyModule<RefPartProps> => {
+  refsModule ??= lazyModule(refs.load);
+  return refsModule;
+};
+
+/** What the composed catalogues add to the shown page: their sidebar sections, and a story's page. */
+type RefSlots = {
+  /** Their sidebar sections. */
+  readonly sidebar: Pick<SidebarProps, "composed">;
+  /** A composed catalogue's story, when one is shown. */
+  readonly page: ReactNode;
+};
+
+/**
+ * What the composed catalogues add to the shown page: their sidebar sections, and a story's page when one is shown;
+ * nothing for a catalogue that composes none.
+ *
+ * @param refs - the composed catalogues, if any.
+ * @param current - the shown story of one of them, if any.
+ * @param links - how a story of theirs is linked and opened.
+ * @param switches - this catalogue's switches, with the view's values.
+ */
+const refSlotsOf = (
+  refs: ShellRefs | undefined,
+  current: RefStoryPlace | undefined,
+  links: Pick<SidebarRefsProps, "refStoryHref" | "onOpenRefStory">,
+  switches: Readonly<Record<string, string>>
+): RefSlots => {
+  if (refs === undefined) return { sidebar: {}, page: null };
+  const page: RefPartProps | undefined =
+    current === undefined ? undefined : { place: "page", refs: refs.catalogues, ...current, switches };
+  return {
+    sidebar: {
+      composed: <RefSlot refs={refs} part={{ place: "sidebar", refs: refs.catalogues, current, ...links }} />
+    },
+    page: <RefSlot refs={refs} part={page} />
+  };
+};
 
 /** The shown docs page's place; none on any other page. */
 const pageLocationOf = (shown: Shown): PageLocation | undefined =>
@@ -870,7 +993,23 @@ const ShellPage = ({
 
   const { help, showHelp } = useShortcutHelp();
 
-  const shown = shownPage(tree, address.page);
+  let shown = shownPage(tree, address.page);
+  // what composition adds to the page; the build removes this whole block from a catalogue that composes none
+  let refSlots: RefSlots | undefined;
+  if (HAS_REFS) {
+    const refs = shellRefs();
+    shown = shownRef(tree, address.page, refs, shown);
+    refSlots = refSlotsOf(
+      refs,
+      refPlaceOf(shown),
+      {
+        refStoryHref: (place: RefStoryPlace): string =>
+          addressQuery(pageAddress(refPageOf(place)), catalogue),
+        onOpenRefStory: (place: RefStoryPlace): void => openPage(refPageOf(place))
+      },
+      address.view.switches
+    );
+  }
   const location = componentLocationOf(shown);
   const ownPage = recentPageOf(shown);
   const recent = useRecentPages(ownPage);
@@ -997,6 +1136,7 @@ const ShellPage = ({
         currentPageId={shownPageLocation?.page.id}
         pageHref={(id: string): string => addressQuery(pageAddress({ kind: "page", id }), catalogue)}
         onOpenPage={(id: string): void => openPage({ kind: "page", id })}
+        {...refSlots?.sidebar}
         componentHref={(sourceId: string, componentTitle: string): string =>
           addressQuery(pageAddress(titledPage(idsByTitle, sourceId, componentTitle)), catalogue)
         }
@@ -1113,6 +1253,7 @@ const ShellPage = ({
             )}
           />
         ) : null}
+        {refSlots?.page}
         {shown.kind === "missing" ? header : null}
       </main>
     </div>
