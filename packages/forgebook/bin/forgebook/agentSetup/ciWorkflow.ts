@@ -5,11 +5,12 @@
  * @remarks
  * The whole history is fetched, since `verify` compares with where the branch left its target. The target's name comes
  * through the environment and not into the script, where a branch's name could be read as shell. Its permissions are the
- * least a read needs. Pure.
+ * least a read needs, and its actions are pinned as `workflowActions.ts` says. Pure.
  *
  * @module
  */
 import type { PackageManagerName } from "../newProject/newProject.types.ts";
+import { CHECKOUT, SETUP_BUN, SETUP_NODE } from "../workflowActions.ts";
 import { forgebookCommandLine } from "./projectRunner.ts";
 
 /** The workflow's file, from the repository's root. */
@@ -22,7 +23,7 @@ const SETUP: Readonly<
   npm: { steps: [], install: "npm ci" },
   pnpm: { steps: ["      - run: corepack enable"], install: "pnpm install --frozen-lockfile" },
   yarn: { steps: ["      - run: corepack enable"], install: "yarn install --immutable" },
-  bun: { steps: ["      - uses: oven-sh/setup-bun@v2"], install: "bun install --frozen-lockfile" }
+  bun: { steps: [`      - uses: ${SETUP_BUN}`], install: "bun install --frozen-lockfile" }
 };
 
 /**
@@ -53,10 +54,10 @@ export const workflowText = (manager: PackageManagerName, folder: string, hasLoc
     "    runs-on: ubuntu-latest",
     "    timeout-minutes: 30",
     "    steps:",
-    "      - uses: actions/checkout@v4",
+    `      - uses: ${CHECKOUT}`,
     "        with:",
     "          fetch-depth: 0",
-    "      - uses: actions/setup-node@v4",
+    `      - uses: ${SETUP_NODE}`,
     "        with:",
     "          node-version: 24",
     ...steps,
