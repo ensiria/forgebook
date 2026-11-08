@@ -146,20 +146,28 @@ const ExampleCode = ({
 }): ReactNode => {
   const { isCopied, copy } = useCopy();
   const write = useCodeWriter();
+  // a page of fifty stories would hold fifty coloured blocks nobody opened: the code is written when first shown, then
+  // kept, so closing it plays the same transition as opening it
+  const [wasShown, setWasShown] = useState(isShown);
+  if (isShown && !wasShown) setWasShown(true);
   return (
-    // the code stays in the page while closed, so it opens with a transition; inert keeps it out of Tab and
+    // the box stays in the page while closed, so it opens with a transition; inert keeps it out of Tab and
     // screen readers until then
     <div id={id} className="forgebook-example__code" data-open={isShown ? "" : undefined} inert={!isShown}>
       <div className="forgebook-example__code-inner">
-        <button
-          type="button"
-          className="forgebook-example__copy"
-          onClick={(): void => copy(storyCodeText(source, write))}
-          aria-live="polite"
-        >
-          {isCopied ? STRINGS.copied : LATER_STRINGS.copy}
-        </button>
-        <StoryCodeBlock {...source} />
+        {wasShown || isShown ? (
+          <>
+            <button
+              type="button"
+              className="forgebook-example__copy"
+              onClick={(): void => copy(storyCodeText(source, write))}
+              aria-live="polite"
+            >
+              {isCopied ? STRINGS.copied : LATER_STRINGS.copy}
+            </button>
+            <StoryCodeBlock {...source} />
+          </>
+        ) : null}
       </div>
     </div>
   );
