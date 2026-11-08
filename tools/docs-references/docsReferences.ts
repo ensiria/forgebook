@@ -58,8 +58,11 @@ const PLACEHOLDER = /<[^<>]+>/g;
 /** The punctuation a fragment may start or end with, left over around a placeholder. */
 const EDGE_PUNCTUATION = /^[\s:;,.()"'`]+|[\s:;,.()"'`]+$/g;
 
-/** A `forgebook` command in a line of shell: its name, then what follows up to a comment or another command. */
-const COMMAND_IN_LINE = /(?:^|[\s`(])forgebook ([a-z][a-z-]*)((?:[^#`;|&]*))/g;
+/**
+ * A `forgebook` command in a line of shell: its name, then what follows up to a comment or another command. A
+ * `forgebook` that is an option's value, the package `pnpm --filter forgebook test` picks, runs no command of its own.
+ */
+const COMMAND_IN_LINE = /(?:^|[\s`(])(?<!(?:--filter|-F) )forgebook ([a-z][a-z-]*)((?:[^#`;|&]*))/g;
 
 /** An option given on a command line, without its value. */
 const OPTION = /(?:^|\s)--([a-z][a-z0-9-]*)/g;

@@ -159,6 +159,10 @@ describe("namedCommands and commandProblems", () => {
     ]);
   });
 
+  it("does not read the package a filter picks as a command", () => {
+    expect(namedCommands("`pnpm --filter forgebook test` and `pnpm -F forgebook build`")).toEqual([]);
+  });
+
   it("names a command that does not exist, and an option a command does not take", () => {
     const [named] = namedCommands("`forgebook init --agents --config x --force` and `forgebook start`");
     expect(named === undefined ? [] : commandProblems(named, description)).toEqual([
