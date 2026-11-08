@@ -149,3 +149,24 @@ describe("newStories", () => {
     expect(text).toContain('import Badge from "./Badge.vue";');
   });
 });
+
+describe("newStories with wrappers", () => {
+  it("imports them and draws every story inside them, outermost first", () => {
+    const text = newStories({
+      docs: BADGE,
+      importStatement: 'import { Badge } from "./Badge";',
+      title: "Actions/Badge",
+      typesModule: "@forgebook/react",
+      wrappers: [
+        { name: "Theme", importStatement: 'import Theme from "../Theme";' },
+        { name: "Menu", importStatement: 'import { Menu } from "./Menu";' }
+      ]
+    });
+    expect(text).toContain(
+      'import { Badge } from "./Badge";\nimport Theme from "../Theme";\nimport { Menu } from "./Menu";'
+    );
+    expect(text).toContain(
+      "component: Badge, decorators: [(Story) => <Theme><Menu><Story /></Menu></Theme>] } satisfies Meta<typeof Badge>;"
+    );
+  });
+});

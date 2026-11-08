@@ -45,6 +45,14 @@ export type CorpusStorybook = {
   readonly env?: Readonly<Record<string, string>>;
 };
 
+/** A story that does not draw in the library's own Storybook either, at the pinned commit. */
+export type UpstreamFailure = {
+  /** Its id in Forgebook. */
+  readonly story: string;
+  /** Why it fails there too, as Storybook shows it. */
+  readonly reason: string;
+};
+
 /** A real corpus. */
 export type RealCorpus = {
   /** Its name: the folder under `corpora/`. */
@@ -63,6 +71,11 @@ export type RealCorpus = {
   readonly folder: string;
   /** What Storybook's own indexer counts at this commit: a run that finds another number fails. */
   readonly expected: { readonly files: number; readonly stories: number };
+  /**
+   * The stories that fail in the library's own Storybook at this commit: a run where they fail is not failed for them,
+   * and a run where one of them draws fails, since the definition no longer says what the library does. None by default.
+   */
+  readonly failsInStorybook?: readonly UpstreamFailure[];
   /** The story and the component measured. */
   readonly measured: CorpusMeasured;
   /** The edits, of a story file and of a component. */
