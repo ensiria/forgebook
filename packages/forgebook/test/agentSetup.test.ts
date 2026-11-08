@@ -335,6 +335,10 @@ describe("the files written", () => {
     expect(readFileSync(join(root, ".git/hooks/pre-commit"), "utf8")).toContain(
       "npx --no forgebook verify --quick"
     );
+    const again = writeAgentFiles({ ...request, projectDir: root, hooks: ["pre-commit"] });
+    expect(again.hooks).toEqual(hooks);
+    expect(again.unchanged).toContain(".git/hooks/pre-commit");
+    expect(JSON.stringify(again.nextSteps)).not.toContain("hook setup of their own");
     const taken = repositoryWith({});
     writeFileSync(join(taken, ".git/hooks/pre-commit"), "ours");
     const left = writeAgentFiles({ ...request, projectDir: taken, hooks: ["pre-commit"] });

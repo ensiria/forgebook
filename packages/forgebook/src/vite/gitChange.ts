@@ -45,6 +45,22 @@ export const gitOutput = async (dir: string, ...args: readonly string[]): Promis
   (await run("git", ["-c", "core.quotePath=false", ...args], { cwd: dir, maxBuffer: MAX_OUTPUT })).stdout;
 
 /**
+ * Runs git in a folder, in the environment given rather than this process's.
+ *
+ * @param dir - a folder of the repository.
+ * @param env - the environment git gets.
+ * @param args - its arguments.
+ * @returns what it wrote.
+ */
+export const gitOutputIn = async (
+  dir: string,
+  env: NodeJS.ProcessEnv,
+  ...args: readonly string[]
+): Promise<string> =>
+  (await run("git", ["-c", "core.quotePath=false", ...args], { cwd: dir, env, maxBuffer: MAX_OUTPUT }))
+    .stdout;
+
+/**
  * The names of a list git wrote with `-z`: otherwise it quotes a name that holds a quotation mark or a tab, which then
  * matches no file and no rule.
  */
