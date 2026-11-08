@@ -98,7 +98,7 @@ export const docsModule = (
  * @param watch - adds a file whose edit renews the module (each story file).
  * @param loaders - the group's loaders besides its story files'.
  * @param cache - the pattern's index kept between starts; none reads every file.
- * @param warm - starts reading the docs of a story file ahead of its request; none in a test run.
+ * @param warm - starts reading the docs of the group's story files ahead of their requests; none in a test run.
  * @param startTexts - a build's: starts reading the files' docs, code and pages, which the module imports from the
  * group's texts module (`builtTexts.ts`); none imports each from its query.
  * @param isKept - whether a listed file may be read; every one by default.
@@ -114,7 +114,7 @@ export const patternModule = (
   watch: (file: string) => void,
   loaders: GroupLoaders,
   cache: DiskCache<KeptIndex> | undefined,
-  warm: ((storyFile: string) => void) | undefined,
+  warm: ((storyFiles: readonly string[]) => void) | undefined,
   startTexts?: (files: readonly IndexedStoryFile[]) => void,
   isKept: IsFileKept = EVERY_FILE,
   isForgiving = false,
@@ -129,8 +129,7 @@ export const patternModule = (
   const { root, patterns } = storyFilesGroupOf(id.slice(FILES_PREFIX.length));
   const { files, refused } = readStoryFiles(root, patterns, watch, cache, isKept);
   if (refused.length > 0 && !isForgiving) throw refusalError(refused);
-  const [first] = files;
-  if (first !== undefined) warm?.(first.file);
+  warm?.(files.map(({ file }) => file));
   startTexts?.(files);
   const code = storyFilesCode(
     root,

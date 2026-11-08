@@ -53,6 +53,12 @@ export type DocsRequest =
   | {
       /** A source file changed: the programs are renewed on their next read. */
       readonly kind: "changed";
+    }
+  | {
+      /** A build's story files: each program holds what they reach rather than its whole configuration. */
+      readonly kind: "stories";
+      /** The story files, absolute. */
+      readonly files: readonly string[];
     };
 
 /** The worker's answer to a request, of the request's kind. */
@@ -88,10 +94,11 @@ export type DocsExtractor = {
   /** What a group of story files' stories render, and the import graph they reach. */
   readonly usage: (files: readonly UsageRequestFile[]) => Promise<UsageResult>;
   /**
-   * Builds the program that holds a story file ahead of its first read, while the worker has nothing else to do, when
-   * the disk keeps no docs: a first start, or a build, starts the worker while Vite still loads the pages.
+   * Builds the program that holds a group's first story file ahead of its first read, while the worker has nothing else
+   * to do, when the disk keeps no docs: a first start, or a build, starts the worker while Vite still loads the pages.
+   * A build's worker is told every file of the group first, so its programs hold what the stories reach.
    */
-  readonly warm: (storyFile: string) => void;
+  readonly warm: (storyFiles: readonly string[]) => void;
   /** Tells the worker a source file changed, so the next read sees it. */
   readonly changed: () => void;
   /**
@@ -335,7 +342,7 @@ export const createDocsExtractor = (
   };
   // a request's answer, or why the worker stopped before giving it
   const send = (request: DocsRequest, resolve: (response: DocsResponse | string) => void): void => {
-    if (request.kind === "changed") return;
+    if (request.kind === "changed" || request.kind === "stories") return;
     pending.set(request.id, resolve);
     started().postMessage(request);
   };
@@ -392,11 +399,18 @@ export const createDocsExtractor = (
       const request: DocsRequest = { kind: "changed" };
       worker?.postMessage(request);
     },
-    warm: (storyFile: string): void => {
+    warm: (storyFiles: readonly string[]): void => {
+      if (readsEverything && storyFiles.length > 0) {
+        // before any read of them, so no program is built whole first
+        const request: DocsRequest = { kind: "stories", files: storyFiles };
+        started().postMessage(request);
+      }
       // only a first start, which the disk can answer nothing for: a later one reads each page's docs from the disk
       // and builds a program only for one it misses, so it stays without one until then
       if (isKeptRead && docsCache !== undefined && !docsCache.isEmpty()) return;
-      warmUps.push(storyFile);
+      const [first] = storyFiles;
+      if (first === undefined) return;
+      warmUps.push(first);
       sendWarmUp();
     },
     listed: (): void => {
