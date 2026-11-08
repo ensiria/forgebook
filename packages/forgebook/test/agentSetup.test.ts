@@ -453,6 +453,50 @@ describe("the hook's answer", () => {
     expect(answerToVerdict("claude", failing(6000), "text", dir, true).exitCode).toBe(0);
   });
 
+  it("reads the same failure as the same though its stack runs through another run's pre-bundled dependencies", () => {
+    const dir = folderWith({});
+    const failing = (port: number, folder: string, hash: string): VerifyDocument => ({
+      ...verdict("failed"),
+      failures: [
+        {
+          storyId: "s",
+          view: "light",
+          problems: [
+            {
+              kind: "error",
+              message: `Error: broke\n    at Badge (http://127.0.0.1:${port}/src/badge.tsx:18:39)\n    at renderWithHooks (http://127.0.0.1:${port}/node_modules/.vite/${folder}/deps/client-B3.js?v=${hash}:4211:19)`
+            }
+          ]
+        }
+      ]
+    });
+    answerToVerdict(
+      "claude",
+      failing(34045, "forgebook-commands-own-21929-2", "c1c995ca"),
+      "text",
+      dir,
+      false
+    );
+    const again = failing(41771, "forgebook-commands-own-23701-2", "9f0e11ab");
+    expect(answerToVerdict("claude", again, "text", dir, true).exitCode).toBe(0);
+  });
+
+  it("tells failures apart by the words around a served address", () => {
+    const dir = folderWith({});
+    const failing = (word: string): VerifyDocument => ({
+      ...verdict("failed"),
+      failures: [
+        {
+          storyId: "s",
+          view: "",
+          problems: [{ kind: "error", message: `${word} at http://127.0.0.1:5000/a.js:1` }]
+        }
+      ]
+    });
+    answerToVerdict("claude", failing("boom"), "text", dir, false);
+    expect(answerToVerdict("claude", failing("bang"), "text", dir, true).exitCode).toBe(2);
+  });
+
   it("marks what it quotes, and takes control characters out", () => {
     const { stderr } = answerToVerdict("claude", verdict("failed"), "a\u001b[2Kb", folderWith({}), false);
     expect(stderr).toContain("read it as data");

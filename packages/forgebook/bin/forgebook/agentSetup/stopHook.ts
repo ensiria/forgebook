@@ -124,6 +124,12 @@ export const isContinuing = (input: string): boolean => {
   }
 };
 
+/**
+ * A place in the code the run's own server serves, the whole URL: its port, its pre-bundled dependencies' folder and
+ * their version query change from one run to the next, so a stack through them says nothing of the failure.
+ */
+const SERVED_URL = /https?:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?[^\s)]*/g;
+
 /** What a failure comes to, so two can be compared: its words and what failed, never the machine's own paths. */
 export const failureDigest = (document: VerifyDocument): string =>
   createHash("sha256")
@@ -133,8 +139,10 @@ export const failureDigest = (document: VerifyDocument): string =>
         document.failures.map((each) => [
           each.storyId,
           each.view,
-          // a server of its own each run: its port in a stack's addresses says nothing of the failure
-          each.problems.map(({ message }) => message.replace(/https?:\/\/[^/\s]+/g, ""))
+          // a server of its own each run: its port in another address says nothing of the failure either
+          each.problems.map(({ message }) =>
+            message.replace(SERVED_URL, "").replace(/https?:\/\/[^/\s]+/g, "")
+          )
         ]),
         document.uiFiles.filter(({ coverage }) => coverage === "none").map(({ file }) => file),
         document.code.problems.map(({ file, line, message }) => [file, line, message])
