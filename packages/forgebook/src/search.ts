@@ -8,7 +8,8 @@
  * half ones. A word is worth what it is worth where it counts most in the result (`searchMatch.ts`), so the ranking is
  * `findComponents`' with more places. A result that holds every word comes before one that does not, which says what it
  * missed. Everything is read from the tree and the index (`searchIndex.ts`), with no server, so the same code answers
- * in the page and on the dev server. Pure.
+ * in the page and on the dev server; the dev server also reads typos (`searchTypos.ts`), which the page leaves out to
+ * stay light. Pure.
  *
  * @module
  */
@@ -360,7 +361,7 @@ export const searchables = (
   });
 
 /** The query, read. */
-type Query = MarkedQuery & {
+export type Query = MarkedQuery & {
   /** Its words as a sentence (`sentenceOf`), when there are several: copied from a page, it finds that page first. */
   readonly sentence: string | undefined;
 };
@@ -371,8 +372,12 @@ const NEAR_SHARE = 0.75;
 /** The most of a query that is read: a page pasted by mistake must not hold the tab for seconds. */
 export const MAX_QUERY = 200;
 
-/** A query's words and phrase. */
-const queryOf = (typed: string): Query => {
+/**
+ * A query's words and phrase.
+ *
+ * @param typed - what was typed.
+ */
+export const queryOf = (typed: string): Query => {
   const query = typed.slice(0, MAX_QUERY);
   const words = wordsOf(query);
   const isSeveral = words.length > 1;
@@ -390,7 +395,7 @@ const isHeldIn = (words: readonly string[], word: string): boolean => {
 };
 
 /** A found thing, before its hits are worked out. */
-type Scored = {
+export type Scored = {
   /** The thing. */
   readonly found: Searchable;
   /** Its score. */
@@ -531,11 +536,43 @@ const resultOf = ({ found, score, matched, missed }: Scored, query: Query, limit
 };
 
 /**
- * What a query finds.
+ * Everything that holds a word of the query, the result holding most of it first.
+ *
+ * @param all - everything that can be found (`searchables`).
+ * @param read - the query, read (`queryOf`).
+ */
+export const scoredAll = (all: readonly Searchable[], read: Query): Scored[] =>
+  all
+    .flatMap((each) => scored(each, read) ?? [])
+    .toSorted(
+      (first, second) =>
+        first.missed.length - second.missed.length ||
+        second.score - first.score ||
+        first.found.name.localeCompare(second.found.name)
+    );
+
+/**
+ * The answer from what was found.
  *
  * @remarks
  * Where something holds every word, what holds much less is left out: `the` must not bring the whole catalogue along
  * with a sentence copied from a page. Nothing holding every word, the nearest are given, each saying what it missed.
+ *
+ * @param found - what holds a word of the query, best first (`scoredAll`).
+ * @param read - the query, read.
+ * @param limits - how much of the answer to give.
+ */
+export const answerOf = (found: readonly Scored[], read: Query, limits: SearchLimits): SearchAnswer => {
+  const hasWhole = found.some((each) => each.missed.length === 0);
+  const kept = found.filter((each) => !hasWhole || each.matched.length >= read.words.length * NEAR_SHARE);
+  return {
+    results: kept.slice(0, limits.results).map((each) => resultOf(each, read, limits.hits)),
+    total: kept.length
+  };
+};
+
+/**
+ * What a query finds, each word read as typed: `searchTypos.ts` reads a word nothing holds as a near name.
  *
  * @param all - everything that can be found (`searchables`).
  * @param query - what was typed.
@@ -547,18 +584,5 @@ export const searchCatalogue = (
   limits: SearchLimits
 ): SearchAnswer => {
   const read = queryOf(query);
-  const found = all
-    .flatMap((each) => scored(each, read) ?? [])
-    .toSorted(
-      (first, second) =>
-        first.missed.length - second.missed.length ||
-        second.score - first.score ||
-        first.found.name.localeCompare(second.found.name)
-    );
-  const hasWhole = found.some((each) => each.missed.length === 0);
-  const kept = found.filter((each) => !hasWhole || each.matched.length >= read.words.length * NEAR_SHARE);
-  return {
-    results: kept.slice(0, limits.results).map((each) => resultOf(each, read, limits.hits)),
-    total: kept.length
-  };
+  return answerOf(scoredAll(all, read), read, limits);
 };

@@ -985,7 +985,11 @@ with their documentation and a few guides. On a dev server, the first search wai
 pages answer first.
 
 Search and `forgebook find` rank alike, with the same synonyms: `modal` finds a `Dialog`, and a name counts more than a
-sentence. A sentence copied from a page finds that page first. Change the words people see with `strings`, as any
+sentence. A sentence copied from a page finds that page first. For `forgebook find`, `forgebook search`, the dev
+server's API and MCP, a word nothing holds as typed is read as the nearest name, one letter away for a word of four
+to seven letters and two from eight: `buton` finds `Button`, and the answer says what it read. A word that finds
+something is never read as another, so a typo never changes an exact answer. The shell's search reads words as
+typed: reading typos would cost more than its first search's weight allows. Change the words people see with `strings`, as any
 other text of the shell (`"search.kindPage": "Guides"`).
 
 ## Design links
@@ -1858,7 +1862,9 @@ tokens, and anyone who reaches the site can read it, so it is written only when 
 `forgebook find` and `find_component` search names, the meta's `keywords`, titles and stories, with the usual synonyms
 (`modal` finds a `Dialog`): write `keywords: ["radio tile group"]` on `OptionCards` and it is found.
 `forgebook search` and `search_catalogue` read the rest, with the same ranking: a prop's name, a sentence of a docs page,
-each result with the words it missed and the address that opens the exact heading or prop.
+each result with the words it missed and the address that opens the exact heading or prop. Both answers carry
+`corrections`, each word read as another (`{ "typed": "buton", "read": "button" }`), empty when the query was read as
+typed.
 
 `forgebook check <id> --semantic` also asks a model what axe cannot see: whether a heading describes its section, an
 image's text says what it shows, a label says what its control does. It is off unless asked, and sends each story's

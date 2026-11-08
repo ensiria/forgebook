@@ -6,7 +6,8 @@
  * The one place both searches take this from, so a person and an agent asking the same words get the same answer:
  * `forgebook find` ranks components with it (`vite/findComponent.ts`), the shell's search and `forgebook search` rank
  * everything else (`search.ts`). Pure, with no model: a lexical ranking is instant, works offline and gives the same
- * answer twice. Case and accents never count. Pure apart from a cache of what a word means.
+ * answer twice. Case and accents never count. Pure apart from a cache of what a word means. Reading a word nothing
+ * holds as a near name is `searchTypos.ts`'s, which the page's search leaves out.
  *
  * @module
  */
@@ -45,7 +46,7 @@ const STARTING_COST = 0.5;
 const MIN_PREFIX = 3;
 
 /** Words designers and code use for the same thing, each group read as one. */
-const SYNONYMS: readonly (readonly string[])[] = [
+export const SYNONYMS: readonly (readonly string[])[] = [
   ["dialog", "modal", "popup", "lightbox"],
   ["select", "dropdown", "picker", "combobox"],
   ["button", "cta"],

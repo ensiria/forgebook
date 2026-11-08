@@ -17,6 +17,7 @@ import type { DocHeading } from "../docPages.ts";
 import type { LiveError } from "../liveErrors.ts";
 import type { PluginCondition } from "../plugin.ts";
 import type { SearchHitKind, SearchReason, SearchResult } from "../search.ts";
+import type { SearchCorrection } from "../searchTypos.ts";
 import type { StoryCheckResult, StoryDiffStatus } from "../storyCheck.ts";
 import type { SetArgs, StoryControl } from "../storyControls.ts";
 import type { SwitchControlKind, SwitchPreview, SwitchRole } from "../switches.ts";
@@ -339,6 +340,8 @@ export type FoundComponentsDocument = {
   readonly query: string;
   /** Up to five, best first; none means nothing in the catalogue holds those words. */
   readonly components: readonly AgentFoundComponent[];
+  /** The words nothing held as typed, and the name each was read as; empty when the query was read as typed. */
+  readonly corrections: readonly SearchCorrection[];
 };
 
 /** A line of a search's result: something inside a page that matched. */
@@ -389,6 +392,8 @@ export type SearchDocument = {
   readonly total: number;
   /** The results, best first; none means nothing in the catalogue holds those words. */
   readonly results: readonly AgentSearchResult[];
+  /** The words nothing held as typed, and the name each was read as; empty when the query was read as typed. */
+  readonly corrections: readonly SearchCorrection[];
   /** What could not be read for the search: the rest still answers. */
   readonly problems: readonly string[];
 };

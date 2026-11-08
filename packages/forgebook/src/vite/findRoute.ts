@@ -77,8 +77,9 @@ export const findAnswer = async ({
   if (query.trim() === "") return { status: 400, body: { error: "No words to look for" } };
   const located = treeComponents(tree);
   const findable = located.map(({ component }) => findableOf(component));
+  const { components: found, corrections } = findComponents(findable, query);
   const components = await Promise.all(
-    findComponents(findable, query).map(async (found): Promise<AgentFoundComponent> => {
+    found.map(async (found): Promise<AgentFoundComponent> => {
       const place = located.find(({ component }) => component.id === found.id);
       const story = place?.component.stories[0]?.id;
       const source = loaded.sources.find((each) => each.id === place?.source.id);
@@ -92,6 +93,6 @@ export const findAnswer = async ({
       };
     })
   );
-  const body: FoundComponentsDocument = { schema: 1, query, components };
+  const body: FoundComponentsDocument = { schema: 1, query, components, corrections };
   return { status: 200, body };
 };
