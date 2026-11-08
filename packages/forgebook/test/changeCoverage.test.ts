@@ -126,6 +126,19 @@ describe("changedUiFiles", () => {
     expect(uiFiles[0]).toMatchObject({ coverage: "through", stories: ["own", "other"] });
   });
 
+  it("leaves out what every story shows while there is no story, as a catalogue just set up has", () => {
+    const { uiFiles, outside } = changedUiFiles({
+      ...input,
+      stories: [],
+      everyStoryFiles: new Set(["/r/forgebook.preview.tsx"]),
+      files: [entry("forgebook.preview.tsx"), entry("src/Badge.tsx")]
+    });
+    expect(uiFiles).toEqual([
+      { file: "src/Badge.tsx", path: "src/Badge.tsx", coverage: "none", stories: [] }
+    ]);
+    expect(outside).toEqual([]);
+  });
+
   it("names a file of another catalogue, unless a story of this one reaches it", () => {
     const { uiFiles, outside } = changedUiFiles({
       ...input,
