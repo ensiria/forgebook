@@ -53,6 +53,12 @@ the Storybook-style stories, the catalogue the tests run on, a catalogue for eac
 Preact, Web Components, plain HTML, Angular, React Native), and small SvelteKit, Next.js and Nuxt apps with their catalogues, `tools/`
 the repository's own commands (`package-build`, `check-commits`).
 
+`docs/compatibility.md` says which versions of Vite, React and each framework every package is tested with. Nobody
+writes it: the weekly `compat` workflow tests each line a package's range claims, and each tool's prerelease, then opens
+a pull request when a result changed (`tools/compat/README.md`). A package that draws stories is listed in
+`tools/compat/matrix.ts`; a range widened to a new major is tested from the next run, and is not supported until its
+cell passes.
+
 ## The rules of the code
 
 - **The core stays light.** No new dependency of `forgebook` without an issue first; a heavy tool (Playwright, Testing
