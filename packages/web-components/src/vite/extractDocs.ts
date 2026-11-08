@@ -145,16 +145,33 @@ type StoryProgram = {
 };
 
 /**
- * The program that holds a story file.
+ * A program that holds a story file.
  *
  * @param storyFile - the story file's absolute path.
+ * @param reach - what the program holds: what the story file reaches, or every file of its configuration.
  * @returns the program and the file in it, or a message when it cannot be read.
  */
-const storyProgram = (storyFile: string): StoryProgram | string => {
-  const read = programFor(storyFile);
+const programOf = (storyFile: string, reach: "asked" | "whole"): StoryProgram | string => {
+  const read = programFor(storyFile, { reach });
   if (typeof read === "string") return read;
   const source = read.program.getSourceFile(storyFile);
   return source === undefined ? `${storyFile} is not in its program` : { ...read, source };
+};
+
+/**
+ * The program that holds a story file and the classes of the tags it names: what the file reaches, or every file of
+ * its configuration when a tag is defined in a file it does not import (an element a preview registers), which a
+ * program of what it reaches does not hold.
+ *
+ * @param storyFile - the story file's absolute path.
+ * @param tags - the tags the meta names, its subcomponents' included.
+ * @returns the program and the file in it, or a message when it cannot be read.
+ */
+const storyProgram = (storyFile: string, tags: readonly string[]): StoryProgram | string => {
+  const reached = programOf(storyFile, "asked");
+  if (typeof reached === "string") return reached;
+  const isEveryTagFound = tags.every((tag) => classOfTag(tag, reached.source, reached.program) !== undefined);
+  return isEveryTagFound ? reached : programOf(storyFile, "whole");
 };
 
 /**
@@ -355,9 +372,12 @@ const readStoryComponent = (storyFile: string): StoryComponentResult => {
   if (ref === undefined) return `${storyFile}: the meta's component is neither a tag nor a class`;
   const manifest = manifestFor(storyFile);
   if (typeof manifest === "string") return manifest;
+  const tags = [ref, ...subcomponentEntries(source).map(({ value }) => refOf(value, source))].flatMap(
+    (each) => (each !== undefined && "tag" in each ? [each.tag] : [])
+  );
   let read: StoryProgram | string | undefined;
   const program = (): StoryProgram | string => {
-    read ??= storyProgram(storyFile);
+    read ??= storyProgram(storyFile, tags);
     return read;
   };
   const subcomponents = subcomponentsOf(source, manifest, program);
@@ -415,7 +435,7 @@ const readFileComponent = (file: string, exportName: string | undefined): StoryC
       };
     }
   }
-  const read = storyProgram(file);
+  const read = programOf(file, "asked");
   if (typeof read === "string") return read;
   const moduleSymbol = read.checker.getSymbolAtLocation(read.source);
   if (moduleSymbol === undefined) return `${file} exports nothing`;
