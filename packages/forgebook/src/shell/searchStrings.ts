@@ -14,7 +14,6 @@ export const SEARCH_STRINGS = textsOfGroup("search", {
   unreadable: "Part of the docs could not be read",
   nothing: (query: string): string => `Nothing found for “${query}”`,
   missing: (words: string): string => `Without: ${words}`,
-  readAs: (words: string): string => `Showing results for ${words}`,
   more: (count: number): string => `${count} more inside`,
   means: (word: string): string => `means ${word}`,
   kindComponent: "Component",

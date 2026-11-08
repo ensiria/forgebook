@@ -17,7 +17,7 @@ import type { DocHeading } from "../docPages.ts";
 import type { LiveError } from "../liveErrors.ts";
 import type { PluginCondition } from "../plugin.ts";
 import type { SearchHitKind, SearchReason, SearchResult } from "../search.ts";
-import type { SearchCorrection } from "../searchMatch.ts";
+import type { SearchCorrection } from "../searchTypos.ts";
 import type { StoryCheckResult, StoryDiffStatus } from "../storyCheck.ts";
 import type { SetArgs, StoryControl } from "../storyControls.ts";
 import type { SwitchControlKind, SwitchPreview, SwitchRole } from "../switches.ts";

@@ -11,7 +11,8 @@
  *
  * @module
  */
-import { correctedWords, correctionsOf, type SearchCorrection, wordsOf, worthOf } from "../searchMatch.ts";
+import { wordsOf, worthOf } from "../searchMatch.ts";
+import { correctedQuery, type SearchCorrection } from "../searchTypos.ts";
 
 /** What the search reads of a component. */
 export type FindableComponent = {
@@ -99,11 +100,11 @@ export const findComponents = (components: readonly FindableComponent[], query: 
   const typed = [...new Set(wordsOf(query))];
   const parted = components.map((component) => ({ component, parts: partsOf(component) }));
   const strict = ranked(parted, typed);
-  const missing = typed.filter((word) => !strict.some((each) => each.matched.includes(word)));
-  const corrections = correctionsOf(
-    missing,
+  const { corrections, words } = correctedQuery(
+    typed,
+    new Set(strict.flatMap((each) => each.matched)),
     parted.map(({ parts }) => parts)
   );
-  const found = corrections.length === 0 ? strict : ranked(parted, correctedWords(typed, corrections));
+  const found = corrections.length === 0 ? strict : ranked(parted, words);
   return { components: found.slice(0, LIMIT), corrections };
 };

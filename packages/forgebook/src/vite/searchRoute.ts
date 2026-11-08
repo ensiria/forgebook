@@ -6,15 +6,10 @@
  */
 import type { StorySource } from "@forgebook/story-format/source";
 
-import {
-  type SearchHit,
-  type SearchResult,
-  type SearchTarget,
-  searchables,
-  searchCatalogue
-} from "../search.ts";
+import { type SearchHit, type SearchResult, type SearchTarget, searchables } from "../search.ts";
 import { isSearchIndex, mergedSearchIndex, type SearchIndex } from "../searchIndex.ts";
 import type { MarkedText } from "../searchMarks.ts";
+import { correctedSearch } from "../searchTypos.ts";
 import { sourceSearchLoaders } from "../sourceFiles.ts";
 import { componentAddressOf, docPageAddressOf, storyAddressOf } from "../viewState.ts";
 import type { AgentSearchHit, AgentSearchResult, SearchDocument } from "./agent.types.ts";
@@ -100,7 +95,7 @@ export const searchAnswer = async ({
     loaded.sources.map(async (source) => ({ id: source.id, ...(await indexOf(source)) }))
   );
   const indexes = new Map(read.map(({ id, index }) => [id, index]));
-  const answer = searchCatalogue(searchables(tree, indexes), query, {
+  const answer = correctedSearch(searchables(tree, indexes), query, {
     results: limitOf(params.get("limit")),
     hits: HITS
   });

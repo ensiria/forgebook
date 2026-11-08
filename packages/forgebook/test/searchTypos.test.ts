@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { correctedWords, correctionsOf, distanceWithin, typosAllowed } from "../src/searchMatch.ts";
+import { correctedWords, correctionsOf, distanceWithin, typosAllowed } from "../src/searchTypos.ts";
 
 describe("distanceWithin", () => {
   it("counts a letter added, removed, changed, and two swapped, one each", () => {

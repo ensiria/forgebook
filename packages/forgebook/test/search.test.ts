@@ -11,6 +11,7 @@ import type { TreePage } from "../src/pageTree.ts";
 import { type SearchAnswer, type SearchHit, searchables, searchCatalogue } from "../src/search.ts";
 import { isSearchIndex, mergedSearchIndex, type SearchIndex } from "../src/searchIndex.ts";
 import { markedText, snippetOf } from "../src/searchMarks.ts";
+import { correctedSearch } from "../src/searchTypos.ts";
 import { sourceSearchLoaders } from "../src/sourceFiles.ts";
 import type { StoryTree, TreeComponent, TreeSource, TreeStory } from "../src/storyTree.ts";
 import { findComponents } from "../src/vite/findComponent.ts";
@@ -189,12 +190,15 @@ describe("searchCatalogue", () => {
     expect(answer.results[0]).toMatchObject({ matched: ["select", "danger"], missed: [] });
   });
 
-  it("reads a word nothing holds as the nearest name, marks what it found, and says so", () => {
-    const answer = search("selcet danger");
+  it("reads a word nothing holds as the nearest name only when asked, marks what it found, and says so", () => {
+    const answer = correctedSearch(searchables(TREE, new Map([["kit", INDEX]])), "selcet danger", {
+      results: 10,
+      hits: 3
+    });
     expect(answer.corrections).toEqual([{ typed: "selcet", read: "select" }]);
     expect(answer.results[0]).toMatchObject({ target: { id: "kit:inputs-select" }, missed: [] });
     expect(answer.results[0]?.name.some((part) => part.isMatch)).toBe(true);
-    expect(search("select").corrections).toEqual([]);
+    expect(search("selcet").total).toBe(0);
   });
 
   it("finds names from the tree alone, before the index arrives", () => {

@@ -985,10 +985,11 @@ with their documentation and a few guides. On a dev server, the first search wai
 pages answer first.
 
 Search and `forgebook find` rank alike, with the same synonyms: `modal` finds a `Dialog`, and a name counts more than a
-sentence. A sentence copied from a page finds that page first. A word nothing holds as typed is read as the nearest
-name, one letter away for a word of four to seven letters and two from eight: `buton` finds `Button`, and the
-results say "Showing results for “button”". A word that finds something is never read as another, so a typo never
-changes an exact answer, and words of three letters or fewer are read as typed. Change the words people see with `strings`, as any
+sentence. A sentence copied from a page finds that page first. For `forgebook find`, `forgebook search`, the dev
+server's API and MCP, a word nothing holds as typed is read as the nearest name, one letter away for a word of four
+to seven letters and two from eight: `buton` finds `Button`, and the answer says what it read. A word that finds
+something is never read as another, so a typo never changes an exact answer. The shell's search reads words as
+typed: reading typos would cost more than its first search's weight allows. Change the words people see with `strings`, as any
 other text of the shell (`"search.kindPage": "Guides"`).
 
 ## Design links

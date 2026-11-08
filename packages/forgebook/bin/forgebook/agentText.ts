@@ -12,7 +12,7 @@ import { keyValue, table } from "@ensiria/cli-kit/layout";
 import type { OutputStyle } from "@ensiria/cli-kit/log.types";
 
 import type { ComponentDocs, PropCondition, PropsNote } from "../../src/componentDocs.ts";
-import type { SearchCorrection } from "../../src/searchMatch.ts";
+import type { SearchCorrection } from "../../src/searchTypos.ts";
 import type {
   StoryCheckReport,
   StoryCheckResult,
