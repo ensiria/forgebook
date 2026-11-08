@@ -6,6 +6,7 @@
  */
 import { join } from "node:path";
 
+import { VERSION } from "@sveltejs/kit";
 import { describe, expect, it } from "vitest";
 
 import { loadKitProject } from "../../src/vite/kitProject.ts";
@@ -14,20 +15,29 @@ import { projectRoutes, projectStaticFiles } from "../../src/vite/projectFiles.t
 /** The test projects' folder. */
 const FIXTURES = join(import.meta.dirname, "..", "fixtures");
 
+/**
+ * The installed SvelteKit's major: a project's `sveltekit()` is the installed one's, and SvelteKit 2's reads
+ * `svelte.config.js` whatever the Vite configuration gives it.
+ */
+const KIT_MAJOR = Number.parseInt(VERSION, 10);
+
 describe("loadKitProject", () => {
-  it("reads SvelteKit 3's options from the project's Vite configuration, and keeps its other plugins", async () => {
-    const project = await loadKitProject(join(FIXTURES, "kit3"), undefined);
-    // `svelte-kit sync` never ran in this project, so its tsconfig.json would extend nothing: the catalogue says so
-    expect(project.problem).toContain("run `svelte-kit sync` first");
-    expect(project.kit["paths"]).toMatchObject({ base: "/docs" });
-    expect(project.kit["version"]).toMatchObject({ name: "3.0.0" });
-    expect(project.svelte).toMatchObject({ configFile: false, compilerOptions: { runes: true } });
-    expect(
-      project.plugins.map((plugin) =>
-        typeof plugin === "object" && plugin !== null && "name" in plugin ? plugin.name : ""
-      )
-    ).toEqual(["project:own"]);
-  });
+  it.runIf(KIT_MAJOR === 3)(
+    "reads SvelteKit 3's options from the project's Vite configuration, and keeps its other plugins",
+    async () => {
+      const project = await loadKitProject(join(FIXTURES, "kit3"), undefined);
+      // `svelte-kit sync` never ran in this project, so its tsconfig.json would extend nothing: the catalogue says so
+      expect(project.problem).toContain("run `svelte-kit sync` first");
+      expect(project.kit["paths"]).toMatchObject({ base: "/docs" });
+      expect(project.kit["version"]).toMatchObject({ name: "3.0.0" });
+      expect(project.svelte).toMatchObject({ configFile: false, compilerOptions: { runes: true } });
+      expect(
+        project.plugins.map((plugin) =>
+          typeof plugin === "object" && plugin !== null && "name" in plugin ? plugin.name : ""
+        )
+      ).toEqual(["project:own"]);
+    }
+  );
 
   it("reads SvelteKit 2's options from svelte.config.js when the Vite configuration is not read", async () => {
     const project = await loadKitProject(join(FIXTURES, "kit2"), false);
