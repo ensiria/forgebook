@@ -33,6 +33,29 @@ test.describe("the tag filter", () => {
     await expect(page).toHaveURL(/component=.*[?&]?tag=beta/);
   });
 
+  test("never lists the whole tree once a checked tag is in the address", async ({ page }) => {
+    await page.goto("/");
+    await filterButton(page).click();
+    await expect(panel(page).getByRole("checkbox")).toHaveCount(6);
+    // the tree's links in every frame the page paints while the address names a tag: what a person would see
+    await page.evaluate(() => {
+      const counts: number[] = [];
+      Object.assign(window, { taggedCounts: counts });
+      const note = (): void => {
+        const tree = document.querySelector('nav[aria-label="Components"]');
+        if (new URLSearchParams(location.search).has("tag"))
+          counts.push(tree?.querySelectorAll("a").length ?? 0);
+        requestAnimationFrame(note);
+      };
+      requestAnimationFrame(note);
+    });
+    await panel(page).getByRole("checkbox", { name: /beta/ }).check();
+    await expect(tree(page).getByRole("link")).toHaveCount(1);
+    const counts = await page.evaluate(() => Reflect.get(window, "taggedCounts"));
+    expect(counts).toEqual(expect.arrayContaining([1]));
+    expect(new Set(counts)).toEqual(new Set([1]));
+  });
+
   test("an address with a tag opens filtered, and a leave-out narrows it", async ({ page }) => {
     await page.goto("/?tag=beta&tag=%21wip");
     await expect(tree(page).getByRole("link")).toHaveCount(1);

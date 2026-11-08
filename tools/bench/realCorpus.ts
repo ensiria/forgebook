@@ -90,6 +90,15 @@ const expectedProblems = (expected: unknown): string[] =>
     ? []
     : ["expected.files and expected.stories are missing"];
 
+/** What is wrong with the stories a definition says fail in the library's own Storybook. */
+const upstreamProblems = (failures: unknown): string[] => {
+  if (failures === undefined) return [];
+  if (!Array.isArray(failures)) return ["corpus.failsInStorybook must be a list"];
+  return failures.flatMap((failure: unknown, index) =>
+    missingTexts(failure, ["story", "reason"], `failsInStorybook[${index}]`)
+  );
+};
+
 /**
  * What is wrong with a parsed definition; nothing when it can be used.
  *
@@ -107,6 +116,7 @@ export const corpusProblems = (value: unknown): string[] => {
   problems.push(...pathProblems(value));
   if (!isCommand(value["install"])) problems.push("corpus.install must be a command, as a list of words");
   problems.push(...expectedProblems(value["expected"]));
+  problems.push(...upstreamProblems(value["failsInStorybook"]));
   problems.push(
     ...missingTexts(
       value["measured"],
