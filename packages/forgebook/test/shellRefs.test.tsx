@@ -30,7 +30,7 @@ describe("the shell's refs", () => {
     flushSync(() =>
       root.render(
         <FrameView
-          frameRef={frameRef}
+          frame={frameRef}
           title="Story"
           address="about:blank"
           heights={new Map()}

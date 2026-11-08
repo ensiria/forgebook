@@ -34,10 +34,10 @@ export type FrameViewProps = {
   /** The addresses of the frames that finished loading: until its own is there, the frame shows that it loads. */
   readonly settled: ReadonlySet<string>;
   /**
-   * Given the iframe. A prop of its own rather than `ref`: the shell runs on the project's React, and React 18 passes no
-   * `ref` to a function component.
+   * The ref the iframe is given. A prop of its own rather than `ref`: the shell runs on the project's React, and React 18
+   * passes no `ref` to a function component. Short, as every byte of the shell's first load counts.
    */
-  readonly frameRef?: Ref<HTMLIFrameElement>;
+  readonly frame?: Ref<HTMLIFrameElement>;
 };
 
 /**
@@ -54,7 +54,7 @@ export const FrameView = ({
   settled,
   sceneHeight = 0,
   fixedHeight,
-  frameRef
+  frame
 }: FrameViewProps): ReactNode => {
   const isLoading = !settled.has(address);
   // while it loads, an empty document reports a height of nothing: the box keeps its waiting height until the story
@@ -65,7 +65,7 @@ export const FrameView = ({
   return (
     <div className="forgebook-frame-box" data-loading={isLoading ? "" : undefined}>
       <iframe
-        ref={frameRef}
+        ref={frame}
         className="forgebook-frame-view"
         title={title}
         src={address}
