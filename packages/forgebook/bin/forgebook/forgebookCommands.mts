@@ -41,6 +41,7 @@ import { graphCommands } from "./graphCommand.mts";
 import { guideCommands } from "./guideCommand.mts";
 import { initCommands } from "./initCommands.mts";
 import { mcpCommands } from "./mcpCommand.mts";
+import { migrateCommands } from "./migrate/migrateCommand.mts";
 import { pagesCommands } from "./pagesCommands.mts";
 import { proofCommands } from "./proofCommand.mts";
 import { runTokens } from "./tokensRun.ts";
@@ -344,6 +345,7 @@ await defineCommands({
     ...initCommands(forgebook),
     ...agentSetupCommands(forgebook),
     ...mcpCommands(forgebook),
+    ...migrateCommands(forgebook),
     story: forgebook.command({
       summary:
         "One story in detail: its args, its component's props, its links; fail when it cannot be read.",

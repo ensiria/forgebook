@@ -241,7 +241,9 @@ too, with a warning.
   edit that adds, renames or retitles a story reloads the pages, as an edit of an Angular story file does. On macOS
   the files you work on (the story files the open frames show, and each file they load once you have edited it) are
   watched one by one, so an edit reaches the page without the system's change events' wait of a tenth of a second or
-  more. Where the system's change events come late or never (a container's mounted volume, a Windows drive under WSL,
+  more. A checkout that moves the repository to another commit (`git switch`, `git reset --hard`, a pull) is heard
+  through git's own files, and each file it wrote reaches the dev server at once: the branch's stories, a removed one
+  gone, a new folder's shown, with no restart. Where the system's change events come late or never (a container's mounted volume, a Windows drive under WSL,
   a network drive), `forgebook dev --poll` checks the files itself.
 - **Switches** for theme, contrast and motion, and the languages you declare; a library adds its own (density, brand)
   through a preset. A direction switch draws every story right to left, and a language declared `dir: "rtl"` does
@@ -1334,6 +1336,7 @@ is a state of the component: the same).
 | `forgebook agents` | Adds Forgebook's short instructions to the project's `AGENTS.md` (and an [Agent Skill](https://agentskills.io) with `--skill`, in `.agents/skills` and `.claude/skills`) |
 | `forgebook guide` | Prints the rest of the instructions on demand: a framework's or a topic's full text |
 | `forgebook docs` | Writes a package's `CATALOG.md` and `llms.txt` from its exports, their TSDoc and its stories |
+| `forgebook migrate` | Rewrites a project for a breaking change: lists the changes (exit 1 while unwritten), writes them with `--write` ([more](#upgrading)) |
 | `forgebook-texts` | Checks a package's story texts and lists what each language still has to translate |
 
 Each command prints its options with `--help`; `stories` and `story` print JSON with `--json`.
@@ -1556,6 +1559,10 @@ catalogue as before; `forgebook dev --frames same-origin` does the same for one 
 worker, the clipboard, full screen, the camera and the microphone. A story's link can no longer take the catalogue's
 tab to another address.
 
+A story's style sheets never leave its frame, on any origin: every story draws in a document of its own, so a story
+file that styles `body` or every `button` leaves the next story, the catalogue's page and the other frames of a docs page
+as they were, on the dev server and in a static build. What one origin changes is scripts, as above.
+
 What stays reachable from a frame: the code it runs (your stories, their components, what the catalogue imports), the
 errors Vite sends every page while you edit, and `forgebook errors`, where a frame reports its own errors. If the
 default port is taken, the frames move to the next free one, so their storage moves with them; give `--frame-port` to
@@ -1746,7 +1753,9 @@ example `.mcp.json` for Claude Code:
 It offers 23 tools: `verify`, which says whether a change is done, `visual_diff`, `check_code`, `component_graph`, a map of the components and tokens to read instead of opening files, `check_page`, which checks a real page of the application, `list_stories`, `changed_stories`, `find_component`, which finds a component by what it is for, `get_story`, `story_address`, `new_stories`, which writes a component's first stories from its props and answers the text without writing a file, `check_story`, which runs the catalogue's browser checks on a story and answers its problems (the project needs `@forgebook/testing` and Playwright for it), `recent_errors`, what the frames open in a browser reported while the agent edited (numbered: `since` gives only the new ones), and `story_shot`, a story's pictures in the answer itself, so the agent looks at what it made, `list_pages` and `get_page`, which read the catalogue's docs pages as Markdown, `search_catalogue`, the search people use, `list_tokens`, `get_token` and `nearest_token`, the design tokens, `list_plugins`, what the catalogue's plugins add, `list_switches`, its switches and each value's view, and `get_guide`, the guide above, a topic at a time. `check`, `shot` and their tools take a view in the address's form (`theme=dark&width=360`) or as words (`"dark it 360"`); every story's `links.component` opens its component's page in that view, so `--view audience=designer` on `forgebook story` and `get_story` gives a link to send a designer. `get_story` also gives the components whose stories use the story's component (`usedIn`), so an agent finds a real use before writing one; `list_stories` gives it for every component when asked (`usedIn: true`, or `forgebook stories --used-in`), since it reads the package's import graph. Run from the catalogue's folder (or give
 `--config`), it uses the running `forgebook dev` when there is one, and starts a dev server of its own otherwise,
 kept while the agent's session lasts; that server keeps its pre-bundled dependencies in
-`node_modules/.vite/forgebook-commands`, apart from those of a `forgebook dev` running in the same folder. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
+`node_modules/.vite/forgebook-commands`, apart from those of a `forgebook dev` running in the same folder; a second
+command's server running at the same time (a `verify` while the MCP server serves) uses a folder of its own beside it,
+removed when it stops. The links name `http://localhost:5173` unless `--url` (or `FORGEBOOK_URL`) says
 where `forgebook dev` runs.
 
 `get_story` gives a story's design too (`design`, [above](#design-links)), so an agent can read the node with a Figma tool
@@ -1802,7 +1811,8 @@ npx forgebook tokens --nearest "#1c1b1b" --json   # the nearest tokens, and whet
 `forgebook mcp` offers the same as `list_tokens`, `get_token` and `nearest_token`. References (`{a.b}`, `$ref`), `$extends`
 and `$root` are followed, and a base alias follows what a theme overrides. Deprecated tokens are never suggested. Colours
 in sRGB, Display P3, Oklab, Oklch and HSL are compared; other spaces are listed but counted as `uncompared`. A theme can
-reference the base; a `$ref` reaches only its own file.
+reference the base; a `$ref` reaches only its own file. A token whose aliases lead back to it, lead nowhere, or come to an
+empty value is named in `problems` and left out, since a browser would draw it with nothing.
 
 An agent that cannot find a component writes a new one, often because the code and the designers use different words.
 `forgebook build --agent-index` adds `forgebook-agent.json` to the built catalogue, and `forgebook mcp --from <address or
@@ -1845,7 +1855,14 @@ name; not through a third party.
 run: custom properties at the root and in theme selectors (`.dark`, `[data-theme]`, a colour-scheme query), and a selector
 holding a dozen or more of them, as a library's root does; Tailwind 4's `@theme` and default theme; a Tailwind configuration
 and its presets, as far as they are written plainly; the sheet and the configuration `components.json` names. `tokenSources`
-says which files were read and `tokenNotes` what needs running to know. Fewer than five colours is not a palette, so colours
+says which files were read and `tokenNotes` what needs running to know. A token a browser would give no value is a problem,
+as a broken tokens file is: one whose references lead back to itself, or one that reads a name with no fallback that
+nothing declares: no sheet read, no `@property`, no package sheet it imports, and no file of the repository that sets it
+(in quotes, as `next/font`'s `variable: "--font-sans"`, or as a declaration in a template or a `.vue` style block).
+Tailwind's `@theme inline { --font-sans: var(--font-sans); }` reads the name set elsewhere, which is no cycle. Where that
+cannot be known (a package sheet not read, names a Sass loop builds, a cycle only inside a theme, which depends on the
+element the theme is set on), the token is a note instead, which fails nothing. A name only code builds (`` `--${key}` ``)
+is not seen: give such a reference a fallback. Fewer than five colours is not a palette, so colours
 are then left to `skipped`. A value it cannot judge takes a comment on its line or the one above, with the reason:
 `/* forgebook-ignore raw-color: a brand's own colour */`; the answer lists each one in `excused`, with its reason. Only files
 in the catalogue's folder are compared (`notCompared` names the others), since another package has its own system. Nothing
@@ -1970,6 +1987,39 @@ package's `package.json`:
 
 `forgebook docs --check` fails in CI when either file is stale. In CI, `forgebook stories --json` fails on a broken story file (a title taken twice, a title that cannot be placed, a file that does not parse) or a
 docs page that names what is not there, and its JSON lists every story for a script.
+
+## Upgrading
+
+While Forgebook is 0.x, a minor version (0.3 to 0.4) may break, and a patch never does. Every breaking change is in the
+package's changelog with what to do, and where the rewrite is mechanical, `forgebook migrate` makes it:
+
+```sh
+npx forgebook migrate --from 0.3.3          # lists what changes since 0.3.3, writes nothing
+npx forgebook migrate --from 0.3.3 --write  # makes the changes
+npx forgebook migrate src/preset.ts         # a library's preset module too, beside the configuration
+```
+
+It reads the configuration and the files given as text, runs none of their code, and keeps their formatting: only what a
+codemod rewrites moves, and each file is written whole or not at all. A file given must be inside the folder it runs in
+and outside `node_modules`. Run twice, it finds nothing the second time. It exits 1 while it lists changes it has not
+written, and 0 otherwise: `advice` (what a codemod could not see into, such as a configuration built by a function) and
+`notes` (the breaking changes no codemod can make) are to read, and leave the exit code at 0. `--json` answers `changes`,
+`advice`, `skipped` and `notes`. With no `--from` it runs only the rewrites of what no longer works; a codemod that keeps
+an old behaviour (`play: "on"`) runs when `--from` says the project comes from before it, or by name with `--only`.
+`--from` names `forgebook`'s version; a note of another package says that package's version and is always listed.
+
+| From forgebook 0.3 to 0.4 | `forgebook migrate` |
+|---|---|
+| The strings `propGroups.choice`, `.text`, `.structured` and `.toggle` are gone: the Props tab lists props in their source's order | removes them from `strings` (`prop-group-strings`) |
+| A built catalogue no longer runs a story's play when it opens | writes `play: "on"` to keep it (`play-on-in-builds`); leave it out for the new default |
+| A configuration key nothing reads, a toolbar naming no control and a story pattern matching no file stop the commands, which name them | in `notes`; fix what they name |
+| The catalogue draws stories with the app's own build: tsconfig paths, the `vite.config` beside it (its code runs) and PostCSS | in `notes`; `appBuild: false`, or one part off, for a catalogue that set them up by hand |
+| `verify` fails on a changed UI file with no story that ran, its JSON is schema 2, and it fails on a published component agents cannot see | in `notes` |
+| `check-code` reads the application's design system with no tokens file, compares bare sizes in React style objects, and fails on duplicate and deprecated components | in `notes`; `tokens: []` says there is no system |
+| `@forgebook/story-format` 0.3: a story file's code entries are `StoryCode \| StoryArgsCode` | in `notes`; narrow with `"text" in entry` |
+
+What counts as breaking, how long a deprecation lasts and what must be true before 1.0:
+[the version policy](https://github.com/ensiria/forgebook/blob/develop/CONTRIBUTING.md#version-policy).
 
 ## Packages
 

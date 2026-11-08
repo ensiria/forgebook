@@ -409,7 +409,10 @@ const resolvedValue = (
     return `${raw.name}: it says ${raw.ownType}, its alias is ${targetType}`;
   }
   try {
-    return { text: valueText(followed(raw.value, byName, new Set([raw.name])), type), type };
+    const text = valueText(followed(raw.value, byName, new Set([raw.name])), type);
+    // an empty value draws nothing, and a browser drops it in silence
+    if (text.trim() === "") return `${raw.name}: its value comes to nothing, so a browser gives it none`;
+    return { text, type };
   } catch (error) {
     return `${raw.name}: ${error instanceof Error ? error.message : String(error)}`;
   }

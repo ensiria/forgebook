@@ -43,6 +43,27 @@ import { pageHtml } from "./pages.ts";
 /** How many ports after the default one the frames try before taking any free port. */
 const PORT_TRIES = 20;
 
+/**
+ * The ports the frames try, in order, 0 for any free one: the one the configuration gives, alone; else the catalogue's
+ * + 1 and the ones after it, as Vite moves on from a port taken. A catalogue on any free port (a command's own server)
+ * gives its frames any free port too: the system hands out such ports in order on some platforms, so the one after the
+ * catalogue's is the next process's, which Vite has just found free and is about to take.
+ *
+ * @param configured - the frames' port the configuration gives (`frames.port`, `--frame-port`); none for the default.
+ * @param catalogue - the port the catalogue listens on.
+ * @param isCatalogueOnAnyPort - whether the catalogue asked for any free port (`port: 0`).
+ * @returns the ports, in order.
+ */
+export const framesPortTries = (
+  configured: number | undefined,
+  catalogue: number,
+  isCatalogueOnAnyPort: boolean
+): readonly number[] => {
+  if (configured !== undefined) return [configured];
+  if (isCatalogueOnAnyPort) return [0];
+  return [...Array.from({ length: PORT_TRIES }, (_, index) => catalogue + 1 + index), 0];
+};
+
 /** A Connect middleware. */
 type Middleware = (
   request: IncomingMessage,
@@ -258,6 +279,8 @@ export const framesServing = (
   const framesRequests = new WeakSet<IncomingMessage>();
   const sharedPaths = frames.kind === "isolated" ? frames.paths : [];
   let framesPort: number | undefined;
+  // read before the catalogue listens: once it does, Vite's resolved options name the port it took
+  const isCatalogueOnAnyPort = server.config.server.port === 0;
   let settle: (placement: FramesPlacement) => void = () => undefined;
   const placed = new Promise<FramesPlacement>((resolvePlacement) => {
     settle = resolvePlacement;
@@ -359,11 +382,7 @@ export const framesServing = (
     if (catalogue === null) throw new Error("Forgebook's frames start once the catalogue listens");
     const framesServer = framesHttpServer(server, server.httpServer, handleFrames);
     const wanted = frames.port ?? catalogue.port + 1;
-    // a port the configuration gives is that port; the default moves on, as Vite's own does
-    const tries =
-      frames.port === undefined
-        ? [...Array.from({ length: PORT_TRIES }, (_, index) => wanted + index), 0]
-        : [wanted];
+    const tries = framesPortTries(frames.port, catalogue.port, isCatalogueOnAnyPort);
     const listened = await listenOnFirstFree(framesServer, tries, catalogue.address);
     if (listened === undefined)
       throw new Error(`Forgebook's frames: port ${wanted} is taken (frames.port, --frame-port)`);
