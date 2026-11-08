@@ -46,6 +46,8 @@ export type SweepResult = {
   readonly drawn: number;
   /** The stories not drawn, by cause, the largest first. */
   readonly failures: readonly SweepFailure[];
+  /** The ids of the stories not drawn, sorted: what a definition's `failsInStorybook` is checked against. */
+  readonly notDrawn: readonly string[];
   /** What the catalogue itself reported as problems. */
   readonly problems: readonly string[];
 };
@@ -116,6 +118,31 @@ export const failuresOf = (outcomes: readonly StoryOutcome[]): SweepFailure[] =>
   return [...groups]
     .map(([reason, group]) => ({ reason, ...group }))
     .sort((first, second) => second.stories - first.stories);
+};
+
+/**
+ * Why a sweep of a real library found another number of stories than its definition states, one line each; nothing
+ * when it agrees. A story the definition says fails in the library's own Storybook may fail here too; one that draws
+ * fails the run, so the definition is corrected rather than left to hide a later failure.
+ *
+ * @param sweep - what the sweep found.
+ * @param expected - the stories Storybook's own indexer counts.
+ * @param failsInStorybook - the ids of the stories that fail in the library's own Storybook.
+ */
+export const sweepProblems = (
+  sweep: Pick<SweepResult, "listed" | "notDrawn">,
+  expected: number,
+  failsInStorybook: readonly string[]
+): readonly string[] => {
+  const missing = expected - sweep.listed;
+  const lost = sweep.notDrawn.filter((id) => !failsInStorybook.includes(id));
+  const drew = failsInStorybook.filter((id) => !sweep.notDrawn.includes(id));
+  return [
+    ...(missing > 0 ? [`${missing} of ${expected} stories were not listed`] : []),
+    ...(missing < 0 ? [`${-missing} stories were listed beyond the ${expected} expected`] : []),
+    ...(lost.length === 0 ? [] : [`${lost.length} of ${sweep.listed} stories did not draw`]),
+    ...drew.map((id) => `${id} drew, though the definition says it fails in Storybook`)
+  ];
 };
 
 /**
@@ -191,6 +218,9 @@ export const sweepStories = async (
       components: listAt(document, "components").length,
       drawn: outcomes.filter((outcome) => outcome.failure === undefined).length,
       failures: failuresOf(outcomes),
+      notDrawn: outcomes
+        .flatMap((outcome) => (outcome.failure === undefined ? [] : [outcome.id]))
+        .sort((first, second) => first.localeCompare(second)),
       problems: listAt(document, "problems").map(String)
     };
   } finally {

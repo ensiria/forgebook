@@ -147,6 +147,10 @@ node tools/bench/bench.mts --corpus primer --compare --work /some/folder
   configuration leaves out, its definition leaves out too, with `!` patterns (Carbon's `forgebook.config.ts` reads the
   library's own list of them), so both tools index the same stories. A run that lists
   fewer stories, or draws fewer than it lists, fails at the end with the difference; the timings are still in the report.
+- **`failsInStorybook`** names, by Forgebook's id and with the reason, the stories that do not draw in the library's own
+  Storybook at that commit either (Aksel's three resize stories with no render, whose component needs a parent's
+  context). They may fail here without failing the run; one of them that draws fails it, so the list never outlives what
+  the library does. A story goes in it only once it was opened in that Storybook and seen to fail.
 - **The install metrics** are absent: what the tool adds to a library is measured on the generated one.
 
 Each report is `report-<name>.json` in `--work`. A corpus's edits write `bench-edit-<n>` into text the story shows, and put

@@ -8,7 +8,8 @@
 import { heldStoryClock } from "@forgebook/story-format/clock";
 import type { ContentState, MountedStory, StoryDrawing } from "forgebook/renderer";
 import { readStory } from "forgebook/story-module";
-import { Activity, lazy, type ReactNode, Suspense, use, useDeferredValue, useEffect, useState } from "react";
+import * as React from "react";
+import { lazy, type ReactNode, Suspense, useDeferredValue, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it } from "vitest";
@@ -69,8 +70,33 @@ const mounted = async (
   return { canvas, settled: story.settled };
 };
 
+/**
+ * React 19's `use` and `Activity`, which React 18 lacks: read from the namespace, so a test run on React 18 finds them
+ * missing instead of failing to load.
+ */
+const use: typeof React.use | undefined = React.use;
+const Activity: typeof React.Activity | undefined = React.Activity;
+
+/** What each promise gave, for a React with no `use`. */
+const givenValues = new WeakMap<Promise<string>, string>();
+
+/**
+ * What a promise gives, suspending until it does: with `use` where React has it, and in React 18 as a library waits,
+ * throwing the promise until its value came.
+ *
+ * @param promise - the promise.
+ */
+const awaitedValue = (promise: Promise<string>): string => {
+  if (typeof use === "function") return use(promise);
+  const value = givenValues.get(promise);
+  if (value !== undefined) return value;
+  throw promise.then((given) => void givenValues.set(promise, given));
+};
+
 /** Shows what a promise gives, once it does. */
-const Words = ({ promise }: { readonly promise: Promise<string> }): ReactNode => <b>{use(promise)}</b>;
+const Words = ({ promise }: { readonly promise: Promise<string> }): ReactNode => (
+  <b>{awaitedValue(promise)}</b>
+);
 
 /** A boundary the first promise's content brings in, which waits for the second. */
 const Waterfall = ({
@@ -81,7 +107,7 @@ const Waterfall = ({
   readonly second: Promise<string>;
 }): ReactNode => (
   <>
-    {use(first)}
+    {awaitedValue(first)}
     <Suspense fallback={<i>Inner</i>}>
       <Words promise={second} />
     </Suspense>
@@ -147,7 +173,7 @@ describe("what a React story waits for", () => {
     expect(canvas.querySelector("i")).toBeNull();
   });
 
-  it("waits for `use` of a promise, deep in the tree and through a portal", async () => {
+  it("waits for a promise read deep in the tree and through a portal", async () => {
     const words = held<string>();
     const { canvas, settled } = await mounted(() => (
       <section>
@@ -201,17 +227,23 @@ describe("what a React story waits for", () => {
     expect(await settled(5000)).toEqual({ state: "settled" });
   });
 
-  it("does not wait for a boundary inside a hidden Activity, which shows nothing", async () => {
-    const words = held<string>();
-    const { settled } = await mounted(() => (
-      <Activity mode="hidden">
-        <Suspense fallback={<i>Loading</i>}>
-          <Words promise={words.promise} />
-        </Suspense>
-      </Activity>
-    ));
-    expect(await settled(5000)).toEqual({ state: "settled" });
-  });
+  // React 18 has no Activity, so nothing there is hidden this way
+  it.runIf(Activity !== undefined)(
+    "does not wait for a boundary inside a hidden Activity, which shows nothing",
+    async () => {
+      // the condition above, again for the type checker
+      if (Activity === undefined) return;
+      const words = held<string>();
+      const { settled } = await mounted(() => (
+        <Activity mode="hidden">
+          <Suspense fallback={<i>Loading</i>}>
+            <Words promise={words.promise} />
+          </Suspense>
+        </Activity>
+      ));
+      expect(await settled(5000)).toEqual({ state: "settled" });
+    }
+  );
 
   it("settles a story that keeps drawing itself", async () => {
     const { settled } = await mounted(() => <Ticks />);

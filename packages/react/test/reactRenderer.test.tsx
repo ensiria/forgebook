@@ -15,10 +15,10 @@ import {
   readPreview,
   readStory
 } from "forgebook/story-module";
-import { forwardRef, memo, type ReactNode, useState } from "react";
+import { forwardRef, lazy, memo, type ReactNode, Suspense, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { reactRenderer } from "../src/reactRenderer.tsx";
+import { awaitedRenderToString, reactRenderer } from "../src/reactRenderer.tsx";
 import { useStoryText } from "../src/texts.ts";
 
 /**
@@ -167,5 +167,32 @@ describe("reactRenderer", () => {
       const html = await reactRenderer.renderToString({ ...drawing({ name: "Ada" }), story });
       expect(html).toContain("Ada");
     }
+  });
+
+  it("renders a story on the server once what it waits for came, with the web streams renderer of this React", async () => {
+    const Late = lazy(async () => ({ default: (): ReactNode => <b>Late Ada</b> }));
+    const story = loaded({
+      render: (): ReactNode => (
+        <Suspense fallback={<i>Loading</i>}>
+          <Late />
+        </Suspense>
+      )
+    });
+    const html = await awaitedRenderToString({ ...drawing({}), story }, AbortSignal.timeout(5000));
+    expect(html).toContain("Late Ada");
+    expect(html).not.toContain("Loading");
+  });
+
+  it("fails a server render with the story's error, one inside a boundary too", async () => {
+    const story = loaded({
+      render: (): ReactNode => (
+        <Suspense fallback={<i>Loading</i>}>
+          <Greeting name="boom" />
+        </Suspense>
+      )
+    });
+    await expect(awaitedRenderToString({ ...drawing({}), story }, AbortSignal.timeout(5000))).rejects.toThrow(
+      "No greeting for boom"
+    );
   });
 });

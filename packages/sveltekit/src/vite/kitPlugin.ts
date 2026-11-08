@@ -133,21 +133,33 @@ export const projectAliases = (
 };
 
 /**
- * Why a public environment module is not this SvelteKit's: each has its own, and the other's does not exist, so it
- * gives nothing (SvelteKit 3 gives no variable by its prefix alone).
+ * Whether a project's environment is the one `src/env.ts` declares: SvelteKit 3's, and SvelteKit 2's behind its
+ * `experimental.explicitEnvironmentVariables` flag, which takes the `$env/*` modules away as SvelteKit 3 does.
+ *
+ * @param project - the project.
+ */
+const declaresEnv = ({ version, kit }: KitProject): boolean =>
+  version === 3 ||
+  (isRecord(kit["experimental"]) && kit["experimental"]["explicitEnvironmentVariables"] === true);
+
+/**
+ * Why a public environment module is not this project's: each environment has its own modules, and the other's give
+ * nothing (SvelteKit 3 gives no variable by its prefix alone).
  *
  * @param module - the module.
- * @param version - the project's SvelteKit.
- * @returns the reason, or none for one of this SvelteKit's.
+ * @param project - the project.
+ * @returns the reason, or none for one of this project's.
  */
-const otherKitsModule = (module: PublicEnvModule, version: 2 | 3): string | undefined => {
+const otherEnvsModule = (module: PublicEnvModule, project: KitProject): string | undefined => {
+  const isDeclared = declaresEnv(project);
   if (module === "$app/env/public")
-    return version === 2
-      ? `${module} is SvelteKit 3's: SvelteKit 2 gives the public variables through $env/static/public and $env/dynamic/public`
-      : undefined;
-  return version === 3
+    return isDeclared
+      ? undefined
+      : `${module} gives the variables src/env.ts declares public, in SvelteKit 3 or with SvelteKit 2's experimental.explicitEnvironmentVariables: this project gives them through $env/static/public and $env/dynamic/public`;
+  if (!isDeclared) return undefined;
+  return project.version === 3
     ? `${module} is SvelteKit 2's: SvelteKit 3 gives the variables src/env.ts declares public through $app/env/public`
-    : undefined;
+    : `${module} is off with experimental.explicitEnvironmentVariables: $app/env/public gives the variables src/env.ts declares public`;
 };
 
 /**
@@ -188,7 +200,7 @@ export const kitPlugin = (project: KitProject): Plugin => {
     textOption(files, "routes", join(textOption(files, "src", "src"), "routes"))
   );
   const staticDir = resolve(dir, textOption(files, "assets", "static"));
-  const { extensions, version } = project;
+  const { extensions } = project;
   let resolved: ResolvedConfig | undefined;
   let settings: KitAppSettings | undefined;
   const settingsNow = (): KitAppSettings => {
@@ -215,7 +227,7 @@ export const kitPlugin = (project: KitProject): Plugin => {
     module: PublicEnvModule,
     watch: (file: string) => void
   ): Promise<string> => {
-    const refusal = otherKitsModule(module, version);
+    const refusal = otherEnvsModule(module, project);
     if (refusal !== undefined) return refusedModule(name, refusal);
     for (const file of envFiles(resolve(dir, textOption(env, "dir", ".")), resolved?.mode ?? "development"))
       watch(file);
