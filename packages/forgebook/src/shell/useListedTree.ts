@@ -2,8 +2,10 @@
  * The tree the sidebar and the story keys list: the whole one, or what the address's tags keep of it.
  *
  * @remarks
- * The filter's code loads only when an address names a tag, so a catalogue nobody filters pays for a question and not
- * for its answer. Until it arrives the whole tree shows, as the search's tree does before its list comes.
+ * The filter's code loads only when an address names a tag, or with the tag filter's button, which hands it over
+ * (`loadedTagFilter`) so the render that puts a checked tag in the address is already filtered. A catalogue nobody
+ * filters pays for a question and not for its answer. Opened on an address that names a tag, the whole tree shows
+ * until the code arrives, as the search's tree does before its list comes.
  *
  * @module
  */
@@ -11,6 +13,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import type { taggedTree } from "../storyTags.ts";
 import type { StoryTree } from "../storyTree.ts";
+
+/** The filter, set by the tag filter's button, which loads its code: read during a render, never waited for. */
+export const loadedTagFilter: { current?: typeof taggedTree } = {};
 
 /**
  * The tree to list.
@@ -24,8 +29,8 @@ export const useListedTree = (tree: StoryTree, tags: readonly string[]): StoryTr
   useEffect(() => {
     if (isFiltered) void import("../storyTags.ts").then((module) => setFilter(() => module.taggedTree));
   }, [isFiltered]);
-  return useMemo(
-    () => (isFiltered && filter !== undefined ? filter(tree, tags) : tree),
-    [filter, isFiltered, tree, tags]
-  );
+  return useMemo(() => {
+    const loaded = filter ?? loadedTagFilter.current;
+    return isFiltered && loaded !== undefined ? loaded(tree, tags) : tree;
+  }, [filter, isFiltered, tree, tags]);
 };
