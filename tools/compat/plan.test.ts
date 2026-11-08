@@ -14,8 +14,10 @@ import { parseManifest } from "./documents.ts";
 import { COMPAT_MATRIX } from "./matrix.ts";
 import {
   cellCommands,
+  cellFixture,
   claimedRange,
   companionVersion,
+  heldFixtureOverrides,
   hostOf,
   newestInLine,
   packagesToRead,
@@ -29,6 +31,7 @@ const manifest = (fields: Partial<Manifest>): Manifest => ({
   scripts: {},
   peerDependencies: {},
   dependencies: {},
+  devDependencies: {},
   ...fields
 });
 
@@ -226,6 +229,61 @@ describe("cellCommands", () => {
   });
 });
 
+describe("cellFixture", () => {
+  const adapter = {
+    name: "@x/kit",
+    folder: "packages/kit",
+    fixture: "fixtures/kit3",
+    hosts: [{ host: "kit", fixtures: { "2": "fixtures/kit2" } }, { host: "vite" }]
+  };
+
+  it("runs a line on its own fixture when the package names one, and every other cell on the package's", () => {
+    expect(cellFixture(adapter, { host: "kit", line: "2" })).toBe("fixtures/kit2");
+    expect(cellFixture(adapter, { host: "kit", line: "3" })).toBe("fixtures/kit3");
+    expect(cellFixture(adapter, { host: "kit", line: "next" })).toBe("fixtures/kit3");
+    expect(cellFixture(adapter, { host: "vite", line: "2" })).toBe("fixtures/kit3");
+  });
+});
+
+describe("heldFixtureOverrides", () => {
+  const adapter = {
+    name: "@x/kit",
+    folder: "packages/kit",
+    fixture: "fixtures/kit3",
+    hosts: [{ host: "kit", fixtures: { "2": "fixtures/kit2" } }, { host: "vite" }]
+  };
+  const pins: Readonly<Record<string, Manifest>> = {
+    "fixtures/kit2": manifest({ name: "@fixture/kit2", devDependencies: { "@x/kit-core": "2.70.4" } }),
+    "fixtures/kit3": manifest({ name: "@fixture/kit3", devDependencies: { "@x/kit-core": "3.1.1" } })
+  };
+  const read = (folder: string): Manifest => {
+    const found = pins[folder];
+    if (found === undefined) throw new Error(`no manifest for ${folder}`);
+    return found;
+  };
+
+  it("keeps the other line's fixture at the version it pins, and touches nothing for a tool with one fixture", () => {
+    const packages = { "@x/kit-core": "3.1.1" };
+    expect(heldFixtureOverrides(adapter, { host: "kit", line: "3", packages }, read)).toEqual({
+      "@fixture/kit2>@x/kit-core": "2.70.4"
+    });
+    expect(
+      heldFixtureOverrides(adapter, { host: "kit", line: "2", packages: { "@x/kit-core": "2.70.4" } }, read)
+    ).toEqual({ "@fixture/kit3>@x/kit-core": "3.1.1" });
+    expect(
+      heldFixtureOverrides(adapter, { host: "vite", line: "8", packages: { vite: "8.3.6" } }, read)
+    ).toEqual({});
+  });
+
+  it("refuses to hold a fixture at a range", () => {
+    const ranged = (): Manifest =>
+      manifest({ name: "@fixture/kit2", devDependencies: { "@x/kit-core": "^2.0.0" } });
+    expect(() =>
+      heldFixtureOverrides(adapter, { host: "kit", line: "3", packages: { "@x/kit-core": "3.1.1" } }, ranged)
+    ).toThrow("not an exact version");
+  });
+});
+
 describe("the repository's matrix", () => {
   const root = resolve(import.meta.dirname, "../..");
   const readReal = (folder: string): Manifest =>
@@ -236,10 +294,31 @@ describe("the repository's matrix", () => {
       expect(readReal(adapter.folder).name).toBe(adapter.name);
       expect(existsSync(join(root, adapter.fixture, "package.json"))).toBe(true);
       expect("build" in readReal(adapter.fixture).scripts).toBe(true);
-      for (const entry of adapter.hosts)
+      for (const entry of adapter.hosts) {
         expect(claimedRange(adapter, entry, hostOf(COMPAT_MATRIX, entry.host), readReal)).not.toBe("");
+        for (const fixture of Object.values(entry.fixtures ?? {}))
+          expect("build" in readReal(fixture).scripts, fixture).toBe(true);
+      }
     }
     expect(packagesToRead(COMPAT_MATRIX)).toContain("vite");
+  });
+
+  it("runs SvelteKit 2 on a SvelteKit 2 app, and SvelteKit 3 on the package's own", () => {
+    const kit = COMPAT_MATRIX.adapters.find((adapter) => adapter.name === "@forgebook/sveltekit");
+    if (kit === undefined) throw new Error("the matrix tests the SvelteKit package");
+    expect(cellFixture(kit, { host: "sveltekit", line: "2" })).toBe("fixtures/sveltekit2");
+    expect(cellFixture(kit, { host: "sveltekit", line: "3" })).toBe("fixtures/sveltekit");
+    expect(readReal("fixtures/sveltekit2").name).toBe("@fixture/sveltekit2");
+    // the SvelteKit 3 cell keeps the SvelteKit 2 app on its own SvelteKit, whose install refuses SvelteKit 3
+    expect(
+      heldFixtureOverrides(
+        kit,
+        { host: "sveltekit", line: "3", packages: { "@sveltejs/kit": "3.1.1" } },
+        readReal
+      )
+    ).toEqual({
+      "@fixture/sveltekit2>@sveltejs/kit": readReal("fixtures/sveltekit2").devDependencies["@sveltejs/kit"]
+    });
   });
 
   it("covers every published package that draws stories", () => {

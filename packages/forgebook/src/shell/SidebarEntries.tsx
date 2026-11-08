@@ -142,7 +142,8 @@ export const FamilyGroup = ({
             <Icon name="chevronRight" size={12} />
           </span>
           <span className="forgebook-tree__family-name">{group.name}</span>
-          <span className="forgebook-tree__count">{group.components.length}</span>
+          {/* a group of aliases alone holds none of its own, and a 0 beside entries reads as empty */}
+          <span className="forgebook-tree__count">{group.components.length || null}</span>
         </button>
       </h3>
       <TreeFold isOpen={isOpen} isInstant={isInstant} content={entries} />

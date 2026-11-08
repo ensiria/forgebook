@@ -51,7 +51,8 @@ export const parseManifest = (source: string, file: string): Manifest => {
     name: text(value, "name", file),
     scripts: stringMap(value["scripts"], `${file} scripts`),
     peerDependencies: stringMap(value["peerDependencies"], `${file} peerDependencies`),
-    dependencies: stringMap(value["dependencies"], `${file} dependencies`)
+    dependencies: stringMap(value["dependencies"], `${file} dependencies`),
+    devDependencies: stringMap(value["devDependencies"], `${file} devDependencies`)
   };
 };
 

@@ -22,7 +22,7 @@ contributing read `CONTRIBUTING.md`; this file is the same rules, written for an
   `fixtures/svelte`, `fixtures/solid`, `fixtures/preact`, `fixtures/web-components`, `fixtures/html`,
   `fixtures/angular`, `fixtures/react-native`) and small
   SvelteKit, Next.js and Nuxt apps (`fixtures/sveltekit`, `fixtures/nextjs`, `fixtures/nuxt`) whose catalogues they
-  open beside it.
+  open beside it, and a SvelteKit 2 app (`fixtures/sveltekit2`) for the older line the SvelteKit package supports.
 - `tools/`: the repository's own commands (`package-build`, `check-commits`, `bench`, `cold-suite`, `eval`).
 
 ## Before you say a change is done

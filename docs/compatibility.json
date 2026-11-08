@@ -1,6 +1,6 @@
 {
-  "date": "2026-11-07",
-  "runUrl": "https://github.com/ensiria/forgebook/actions/runs/42411664482",
+  "date": "2026-11-08",
+  "runUrl": "https://github.com/ensiria/forgebook/actions/runs/42441596442",
   "cells": [
     {
       "id": "forgebook-angular-angular-20",
@@ -300,14 +300,14 @@
       "host": "next",
       "range": "^15.0.0 || ^16.0.0",
       "line": "next",
-      "version": "16.5.0-canary.43",
+      "version": "16.5.0-canary.44",
       "packages": {
-        "next": "16.5.0-canary.43"
+        "next": "16.5.0-canary.44"
       },
       "tag": "canary",
       "status": "passed",
       "installed": {
-        "next": "16.5.0-canary.43"
+        "next": "16.5.0-canary.44"
       },
       "commands": [
         {
@@ -664,8 +664,7 @@
         "react": "18.3.1",
         "react-dom": "18.3.1"
       },
-      "status": "failed",
-      "reason": "failed: pnpm --filter @forgebook/react-native-web test",
+      "status": "passed",
       "installed": {
         "react": "18.3.1",
         "react-dom": "18.3.1"
@@ -673,7 +672,7 @@
       "commands": [
         {
           "command": "pnpm --filter @forgebook/react-native-web test",
-          "code": 1
+          "code": 0
         },
         {
           "command": "pnpm --filter @fixture/react-native build",
@@ -831,8 +830,7 @@
         "react": "18.3.1",
         "react-dom": "18.3.1"
       },
-      "status": "failed",
-      "reason": "failed: pnpm --filter @forgebook/react test",
+      "status": "passed",
       "installed": {
         "react": "18.3.1",
         "react-dom": "18.3.1"
@@ -840,7 +838,7 @@
       "commands": [
         {
           "command": "pnpm --filter @forgebook/react test",
-          "code": 1
+          "code": 0
         },
         {
           "command": "pnpm --filter @fixture/app build",
@@ -1094,22 +1092,21 @@
       "packages": {
         "@sveltejs/kit": "2.70.4"
       },
-      "status": "failed",
-      "reason": "failed: pnpm --filter @forgebook/sveltekit test; pnpm --filter @fixture/sveltekit test",
+      "status": "passed",
       "installed": {
         "@sveltejs/kit": "2.70.4"
       },
       "commands": [
         {
           "command": "pnpm --filter @forgebook/sveltekit test",
-          "code": 1
+          "code": 0
         },
         {
-          "command": "pnpm --filter @fixture/sveltekit test",
-          "code": 1
+          "command": "pnpm --filter @fixture/sveltekit2 test",
+          "code": 0
         },
         {
-          "command": "pnpm --filter @fixture/sveltekit build",
+          "command": "pnpm --filter @fixture/sveltekit2 build",
           "code": 0
         }
       ],

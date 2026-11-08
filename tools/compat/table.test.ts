@@ -91,6 +91,27 @@ describe("renderTable", () => {
   });
 });
 
+describe("the commands a section lists", () => {
+  it("names the line that ran other commands, as one with a fixture of its own", () => {
+    const own = [{ command: "pnpm --filter @fixture/app test", code: 0 }];
+    const page = renderTable(MATRIX, {
+      date: "2026-11-09",
+      cells: [
+        cell({
+          line: "18",
+          version: "18.3.1",
+          commands: [{ command: "pnpm --filter @fixture/old test", code: 0 }]
+        }),
+        cell({ line: "19", commands: own }),
+        cell({ line: "next", version: "19.3.0-canary-a", tag: "canary", commands: own })
+      ]
+    });
+    expect(page).toContain("The React 18 cell runs `pnpm --filter @fixture/old test`.");
+    expect(page).toContain("Every other cell runs `pnpm --filter @fixture/app test`.");
+    expect(page).not.toContain("Each cell runs");
+  });
+});
+
 describe("withMissingCells", () => {
   it("counts a planned cell that left no result as not run", () => {
     const {

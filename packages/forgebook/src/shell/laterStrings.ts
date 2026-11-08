@@ -15,6 +15,13 @@ import { lateStrings } from "./strings.ts";
 
 /** The later parts' texts, as shown: Forgebook's, with the catalogue's replacements. */
 export const LATER_STRINGS = lateStrings({
+  docsNav: "Docs",
+  aboutControl: (control: string): string => `About ${control}`,
+  signatureParameter: "Parameter",
+  signatureReturns: "Returns",
+  signatureNone: "It takes no parameters.",
+  apiType: "Type",
+  apiWhat: "What it does",
   audienceError: "This part of the page could not be loaded",
   controlMenu: (label: string): string => `${label} on the toolbar`,
   unpinControl: "Remove from the toolbar",
