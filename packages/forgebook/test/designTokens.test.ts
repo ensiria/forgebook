@@ -173,6 +173,19 @@ describe("references", () => {
     expect(parsed.problems[0]).toBe("tokens.json: a: the alias {missing.token} leads nowhere");
   });
 
+  it("names a token that comes to nothing, itself or through an alias, and keeps the rest", () => {
+    const parsed = read({
+      empty: token({ type: "color", value: "" }),
+      blank: token({ type: "color", value: "{empty}" }),
+      fine: token({ type: "color", value: "#000000" })
+    });
+    expect(parsed.tokens.map((each) => each.name)).toEqual(["fine"]);
+    expect(parsed.problems).toEqual([
+      "tokens.json: empty: its value comes to nothing, so a browser gives it none",
+      "tokens.json: blank: its value comes to nothing, so a browser gives it none"
+    ]);
+  });
+
   it("names a token with no type, since the format has no default", () => {
     expect(read({ a: token({ value: "#000" }) }).problems[0]).toContain("no $type");
   });

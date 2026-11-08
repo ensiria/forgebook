@@ -26,6 +26,7 @@ const SPEC_CATALOGUES: Readonly<Record<string, readonly Catalogue[]>> = {
   "angular.e2e.ts": ["angular"],
   "embed.e2e.ts": ["white-label", "app"],
   "gallery.e2e.ts": ["themes"],
+  "gitSwitch.e2e.ts": ["html"],
   "home.e2e.ts": ["app", "generated-home"],
   "html.e2e.ts": ["html"],
   "nextjs.e2e.ts": ["nextjs"],

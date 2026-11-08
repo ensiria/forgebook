@@ -350,7 +350,7 @@ describe("Vite's dependency scan", () => {
   });
 
   it("goes past a component that does not parse, keeping its imports, with one problem and one warning", () => {
-    // the scan names files by their real path
+    // the scan names files by their real path, and a problem names it in Vite's form, with forward slashes
     const component = join(realpathSync(dir), "Broken.tsx");
     writeFileSync(
       component,
@@ -363,7 +363,9 @@ describe("Vite's dependency scan", () => {
     expect(warnings).toEqual([
       "The dependency scan skipped Broken.tsx:3:13 does not parse: Unexpected token"
     ]);
-    expect(problems.list()).toEqual([`${component}:3:13 does not parse: Unexpected token`]);
+    expect(problems.list()).toEqual([
+      `${VITE_PATHS.normalize(component)}:3:13 does not parse: Unexpected token`
+    ]);
   });
 
   it("reads a .js file holding JSX as JSX, so its imports still count", () => {
