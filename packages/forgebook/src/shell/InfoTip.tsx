@@ -11,7 +11,7 @@
 import { type KeyboardEvent, type ReactNode, useId, useRef } from "react";
 
 import { Icon } from "./icons.tsx";
-import { STRINGS } from "./strings.ts";
+import { LATER_STRINGS } from "./laterStrings.ts";
 
 /** The room kept between the note, its button and the window's edges, in CSS px. */
 const GAP_PX = 6;
@@ -54,7 +54,7 @@ export const InfoTip = ({
         ref={buttonRef}
         type="button"
         className="forgebook-info-tip"
-        aria-label={STRINGS.aboutControl(about)}
+        aria-label={LATER_STRINGS.aboutControl(about)}
         aria-describedby={noteId}
         // its own note is its tooltip: an empty title keeps a parent's (a pinned control's key) from showing over it
         title=""

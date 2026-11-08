@@ -22,7 +22,6 @@ const shellStrings = {
   searchPlaceholder: "Search",
   searchLabel: "Search components, stories, props and docs",
   componentsNav: "Components",
-  docsNav: "Docs",
   sidebarWidth: "Sidebar width",
   hideSidebar: "Hide the sidebar",
   showSidebar: "Show the sidebar",
@@ -40,7 +39,6 @@ const shellStrings = {
   controlChanged: (control: string): string => `${control}: changed`,
   cycleKey: (control: string, key: string): string =>
     `${control}: press ${key} for the next value, Shift+${key} for the one before`,
-  aboutControl: (control: string): string => `About ${control}`,
   backdrop: "Background",
   backdropPlain: "Plain",
   sheets: "Styles",
@@ -105,9 +103,6 @@ const shellStrings = {
   openInFigma: "Open in Figma",
   logic: "Logic",
   logicHint: "About logic, not looks: a scene that uses the hook or the function",
-  signatureParameter: "Parameter",
-  signatureReturns: "Returns",
-  signatureNone: "It takes no parameters.",
   playStatus: { running: "running", passed: "passed", failed: "failed", off: "not run" },
   fixedExamples: "This story draws fixed examples: its props are not set from here. Every prop, for reading:",
   allProps: "Props",
@@ -124,8 +119,6 @@ const shellStrings = {
   a11yCount: (count: number): string => `${count} ${count === 1 ? "problem" : "problems"}`,
   replay: "Replay",
   loadingStory: "Loading the story…",
-  apiType: "Type",
-  apiWhat: "What it does",
   propCount: (count: number): string => `${count} ${count === 1 ? "prop" : "props"}`,
   audience: "Reading for",
   audiences: { everyone: "Everyone", designer: "Designers", coder: "Coders", tester: "Testers" },
@@ -172,7 +165,7 @@ const shellStrings = {
   docsLoading: "Reading the component…",
   tabLoading: "Loading the tab…",
   tabError: "The tab could not be loaded",
-  pageLoadError: "The page could not be loaded",
+  pageLoadError: "The page could not be loaded: reload the page to try again",
   docsError: "The component could not be read",
   indexProblems: "Some story files could not be read or placed"
 };

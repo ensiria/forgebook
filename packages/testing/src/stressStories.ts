@@ -28,6 +28,7 @@ import type {
 import { heldClockAddress } from "forgebook/story-clock";
 import { frameAddress, parseView } from "forgebook/view-state";
 
+import { isFrameSettled } from "./frameSettled.ts";
 import { READY_MS } from "./storyPages.ts";
 
 /** The window, as the browser tests' own. */
@@ -112,12 +113,7 @@ const hostedFrame = async (
   const content = await handle.contentFrame();
   if (content === null) return "The frame did not open";
   try {
-    await content.waitForFunction(
-      (attribute) =>
-        ["ready", "error", "pending"].includes(document.documentElement.getAttribute(attribute) ?? ""),
-      STATUS_ATTRIBUTE,
-      { timeout: READY_MS }
-    );
+    await content.waitForFunction(isFrameSettled, STATUS_ATTRIBUTE, { timeout: READY_MS });
   } catch {
     return `The frame did not say it was ready in ${READY_MS / 1000} s`;
   }

@@ -147,9 +147,11 @@ export const sweepProblems = (
 
 /**
  * The expression a page is polled with until its frame has a status. An expression and not a function's text: Playwright
- * evaluates a string, a function's text is a truthy value, and the wait would return before the story loaded.
+ * evaluates a string, a function's text is a truthy value, and the wait would return before the story loaded. The root
+ * may be missing: a frame that reloads itself on a cold dev server has none between its two documents, and an
+ * expression that throws there ends the wait at once, the story counted as failed with that error while it still loads.
  */
-export const HAS_STATUS = `["ready", "error"].includes(document.documentElement.getAttribute(${JSON.stringify(STATUS)}))`;
+export const HAS_STATUS = `["ready", "error"].includes(document.documentElement?.getAttribute(${JSON.stringify(STATUS)}))`;
 
 /** The script that reads the error a frame shows; empty when it shows none. */
 const shownError = `document.querySelector(".forgebook-frame-error__message")?.textContent ?? ""`;
