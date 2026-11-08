@@ -103,6 +103,21 @@ const coverageOf = (
   return { coverage: reaching.length === 0 ? "none" : covering, stories: reaching.map(({ id }) => id) };
 };
 
+/**
+ * The changed files a story can show: what every story shows is none of them while the catalogue has no story, as a
+ * catalogue just set up has its preview and nothing yet that shows it.
+ *
+ * @param files - the changed files.
+ * @param stories - the catalogue's stories.
+ * @param everyStoryFiles - the files every story shows.
+ */
+const shownFiles = <File extends { readonly absolute: string }>(
+  files: readonly File[],
+  stories: readonly IdentifiedStory[],
+  everyStoryFiles: ReadonlySet<string>
+): readonly File[] =>
+  stories.length > 0 ? files : files.filter(({ absolute }) => !everyStoryFiles.has(absolute));
+
 /** What `changedUiFiles` reads. */
 export type UiFilesInput = {
   /** The files that changed, with their forms in the graph, relative to the repository and to the catalogue. */
@@ -124,7 +139,8 @@ export type UiFilesInput = {
 
 /**
  * The changed files a person sees: those this catalogue can show, with their stories, and those it cannot speak for. A
- * deleted file with no story behind it is left out, as there is nothing left to look at.
+ * deleted file with no story behind it is left out, as there is nothing left to look at, and so is what every story shows
+ * while the catalogue has no story.
  *
  * @param input - the change and the catalogue.
  */
@@ -137,7 +153,7 @@ export const changedUiFiles = ({
 }: UiFilesInput): { readonly uiFiles: readonly ChangedUiFile[]; readonly outside: readonly string[] } => {
   const uiFiles: ChangedUiFile[] = [];
   const outside: string[] = [];
-  for (const { file, path, absolute, isDeleted } of files) {
+  for (const { file, path, absolute, isDeleted } of shownFiles(files, stories, everyStoryFiles)) {
     if (!isUiFile(file, isDeleted ? (): string => "" : readText)) continue;
     const forms = isDeleted ? deletedForms(absolute) : [absolute];
     const found = coverageOf(forms, stories, everyStoryFiles.has(absolute));
