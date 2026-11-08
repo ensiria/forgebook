@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { frameServerCommand, storyTestConfig } from "../src/playwrightConfig.ts";
+import { frameServerCommand, retriesOf, storyTestConfig } from "../src/playwrightConfig.ts";
 
 describe("frameServerCommand", () => {
   it("runs Vite through the package manager that runs the tests", () => {
@@ -45,5 +45,18 @@ describe("storyTestConfig", () => {
     expect(server && !Array.isArray(server) ? server.command : undefined).toContain(
       '--config "C:\\Users\\Ada Lovelace\\kit\\stories/vite.config.ts" '
     );
+  });
+});
+
+describe("retriesOf", () => {
+  it("retries twice in CI, where a test's browser can be lost to the machine, and never on a developer's", () => {
+    const server = { dir: "/stories", port: 4100, browserPort: 4101 };
+    expect(retriesOf(server, "true")).toBe(2);
+    expect(retriesOf(server, undefined)).toBe(0);
+  });
+
+  it("keeps the package's own count, none included", () => {
+    expect(retriesOf({ dir: "/stories", port: 4100, browserPort: 4101, retries: 0 }, "true")).toBe(0);
+    expect(retriesOf({ dir: "/stories", port: 4100, browserPort: 4101, retries: 3 }, undefined)).toBe(3);
   });
 });
