@@ -1,3 +1,30 @@
+## 0.2.5 (2026-11-08)
+
+### 🚀 Features
+
+- **forgebook:** bind generic props to the component, and mark omitted discriminants ([c9c24bc1](https://github.com/ensiria/forgebook/commit/c9c24bc1))
+- **forgebook:** draw projects that write JSX in .js files ([d052543c](https://github.com/ensiria/forgebook/commit/d052543c))
+- **forgebook:** take forgebook new's values from where the application draws a component ([4f25e4e5](https://github.com/ensiria/forgebook/commit/4f25e4e5))
+- **forgebook:** wait for what a story loads before a frame says ready ([a730e02f](https://github.com/ensiria/forgebook/commit/a730e02f))
+
+### 🩹 Fixes
+
+- **react:** render on the server with the web streams entry React 18 has ([52c2f78e](https://github.com/ensiria/forgebook/commit/52c2f78e))
+- **forgebook:** compile only the catalogue's own .js modules' JSX ([426f0598](https://github.com/ensiria/forgebook/commit/426f0598))
+- **forgebook:** read every variant's props, and say why a type is unread ([ddf08ea5](https://github.com/ensiria/forgebook/commit/ddf08ea5))
+- **testing:** keep Vite a dependency, and say what a plugin's view needs ([9e140371](https://github.com/ensiria/forgebook/commit/9e140371))
+- **forgebook:** bring Forgebook's own Vite and React ([56dca767](https://github.com/ensiria/forgebook/commit/56dca767))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.3.0
+- Updated forgebook to 0.4.0
+- Updated @forgebook/testing to 0.2.5
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.2.4 (2026-11-06)
 
 ### 🧱 Updated Dependencies

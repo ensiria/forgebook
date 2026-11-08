@@ -1,3 +1,31 @@
+## 0.3.0 (2026-11-08)
+
+### 🚀 Features
+
+- **forgebook:** show a component's status as a badge ([ba41f8ee](https://github.com/ensiria/forgebook/commit/ba41f8ee))
+- ⚠️  **story-format:** carry a story's written args in its file's code ([614a0df7](https://github.com/ensiria/forgebook/commit/614a0df7))
+- **forgebook:** show the code a story file writes in Show code ([cc4c8d4e](https://github.com/ensiria/forgebook/commit/cc4c8d4e))
+- **forgebook:** wait for what a story loads before a frame says ready ([a730e02f](https://github.com/ensiria/forgebook/commit/a730e02f))
+- **forgebook:** offer a switch's values as a gallery of previews ([82a9578c](https://github.com/ensiria/forgebook/commit/82a9578c))
+- **forgebook:** let a catalogue register its own panel controls ([e2417284](https://github.com/ensiria/forgebook/commit/e2417284))
+- **forgebook:** edit objects, lists and mixed unions in the panel ([5033c6d2](https://github.com/ensiria/forgebook/commit/5033c6d2))
+
+### 🩹 Fixes
+
+- **forgebook:** stop on a configuration or link that cannot be read ([cf3ce801](https://github.com/ensiria/forgebook/commit/cf3ce801))
+- **forgebook:** keep the catalogue drawing past a broken story file ([4bd1ab5b](https://github.com/ensiria/forgebook/commit/4bd1ab5b))
+
+### ⚠️  Breaking Changes
+
+- **story-format:** carry a story's written args in its file's code  ([614a0df7](https://github.com/ensiria/forgebook/commit/614a0df7))
+  `StoryFileCode` entries are `StoryCode | StoryArgsCode`.
+  Code that read `.text` of every entry, or took any entry for a render,
+  narrows first with `"text" in entry`.
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.2.4 (2026-11-06)
 
 This was a version bump only for @forgebook/story-format to align it with other projects, there were no code changes.

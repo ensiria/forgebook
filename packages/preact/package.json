@@ -1,6 +1,6 @@
 {
   "name": "@forgebook/preact",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Forgebook for Preact: the story types and hooks, the renderer the frame mounts a story with on Preact itself, and the adapter that reads a Preact component's props.",
   "license": "MIT",
   "repository": {

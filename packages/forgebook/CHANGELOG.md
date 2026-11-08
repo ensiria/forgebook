@@ -1,3 +1,165 @@
+## 0.4.0 (2026-11-08)
+
+### 🚀 Features
+
+- **forgebook:** report components with no story and stories nobody uses ([56decb86](https://github.com/ensiria/forgebook/commit/56decb86))
+- **forgebook:** read a typo in a search as the nearest name ([0b46596a](https://github.com/ensiria/forgebook/commit/0b46596a))
+- **shell:** compose catalogues already published, read-only ([d64d1c44](https://github.com/ensiria/forgebook/commit/d64d1c44))
+- **forgebook:** name a token that resolves to nothing ([29bc0a2e](https://github.com/ensiria/forgebook/commit/29bc0a2e))
+- **forgebook:** add forgebook migrate and a version policy ([a93bab56](https://github.com/ensiria/forgebook/commit/a93bab56))
+- **forgebook:** show a component's status as a badge ([ba41f8ee](https://github.com/ensiria/forgebook/commit/ba41f8ee))
+- **forgebook:** check bare sizes in React style objects ([a46eb592](https://github.com/ensiria/forgebook/commit/a46eb592))
+- **forgebook:** bind generic props to the component, and mark omitted discriminants ([c9c24bc1](https://github.com/ensiria/forgebook/commit/c9c24bc1))
+- **forgebook:** draw projects that write JSX in .js files ([d052543c](https://github.com/ensiria/forgebook/commit/d052543c))
+- **forgebook:** show the code a story file writes in Show code ([cc4c8d4e](https://github.com/ensiria/forgebook/commit/cc4c8d4e))
+- **forgebook:** count in verify only the problems a change brought ([c7b2bee1](https://github.com/ensiria/forgebook/commit/c7b2bee1))
+- **forgebook:** draw forgebook new's stories inside the providers their errors name ([2ed2a12e](https://github.com/ensiria/forgebook/commit/2ed2a12e))
+- **forgebook:** take forgebook new's values from where the application draws a component ([4f25e4e5](https://github.com/ensiria/forgebook/commit/4f25e4e5))
+- **forgebook:** fail verify on a story file written for other props ([8836e776](https://github.com/ensiria/forgebook/commit/8836e776))
+- **nuxt:** draw with what the project's Nuxt modules give components ([803496d0](https://github.com/ensiria/forgebook/commit/803496d0))
+- **forgebook:** try a story's states nobody wrote, with no story written ([bc6edcb9](https://github.com/ensiria/forgebook/commit/bc6edcb9))
+- **forgebook:** step through a play, with each action it took ([518f3649](https://github.com/ensiria/forgebook/commit/518f3649))
+- **forgebook:** build again on every change with forgebook build --watch ([24a7bb67](https://github.com/ensiria/forgebook/commit/24a7bb67))
+- **forgebook:** prove a pull request's states from CI, with nothing stored ([67c87151](https://github.com/ensiria/forgebook/commit/67c87151))
+- ⚠️  **forgebook:** let a reader keep a story's play from running on open ([e5832e6d](https://github.com/ensiria/forgebook/commit/e5832e6d))
+- ⚠️  **forgebook:** list the panel's props in the order the source declares them ([4073372a](https://github.com/ensiria/forgebook/commit/4073372a))
+- **forgebook:** list the shell's keys, and let a reader turn them off ([2d0cfbec](https://github.com/ensiria/forgebook/commit/2d0cfbec))
+- **forgebook:** set up a project's coding agents with init ([784cdd96](https://github.com/ensiria/forgebook/commit/784cdd96))
+- ⚠️  **forgebook:** fail verify on a published component agents cannot see ([adb9d6ba](https://github.com/ensiria/forgebook/commit/adb9d6ba))
+- **forgebook:** let a design system say how to choose and how parts fit ([6f373c57](https://github.com/ensiria/forgebook/commit/6f373c57))
+- **forgebook:** filter the sidebar by a story's tags ([ef0fb257](https://github.com/ensiria/forgebook/commit/ef0fb257))
+- ⚠️  **forgebook:** check what a change reuses against what exists ([ba7d39f5](https://github.com/ensiria/forgebook/commit/ba7d39f5))
+- **forgebook:** report the values and components a project uses ([f797ed9e](https://github.com/ensiria/forgebook/commit/f797ed9e))
+- ⚠️  **forgebook:** read the design system the application already has ([ef13b397](https://github.com/ensiria/forgebook/commit/ef13b397))
+- **forgebook:** draw stories with the app's own build ([e4ead8d3](https://github.com/ensiria/forgebook/commit/e4ead8d3))
+- **forgebook:** wait for what a story loads before a frame says ready ([a730e02f](https://github.com/ensiria/forgebook/commit/a730e02f))
+- **forgebook:** offer a switch's values as a gallery of previews ([82a9578c](https://github.com/ensiria/forgebook/commit/82a9578c))
+- **forgebook:** let a catalogue register its own panel controls ([e2417284](https://github.com/ensiria/forgebook/commit/e2417284))
+- **forgebook:** edit objects, lists and mixed unions in the panel ([5033c6d2](https://github.com/ensiria/forgebook/commit/5033c6d2))
+- **forgebook:** start a catalogue with forgebook init, no option ([44b00796](https://github.com/ensiria/forgebook/commit/44b00796))
+- ⚠️  **forgebook:** make verify unable to pass on nothing ([05478180](https://github.com/ensiria/forgebook/commit/05478180))
+- **forgebook:** keep agents' written instructions short, the rest on demand ([cf1f60f3](https://github.com/ensiria/forgebook/commit/cf1f60f3))
+
+### 🩹 Fixes
+
+- **forgebook:** reload the pages after a branch switch another reader saw first ([2b2a5727](https://github.com/ensiria/forgebook/commit/2b2a5727))
+- **forgebook:** let a change with no UI file pass before a first story ([6f40bb41](https://github.com/ensiria/forgebook/commit/6f40bb41))
+- **forgebook:** pin the verify workflow's actions to current releases ([8c97839b](https://github.com/ensiria/forgebook/commit/8c97839b))
+- **forgebook:** stop naming the preview as a file without stories ([3a87191a](https://github.com/ensiria/forgebook/commit/3a87191a))
+- **forgebook:** ask npx for forgebook's version in the commit hook ([70a6e5bb](https://github.com/ensiria/forgebook/commit/70a6e5bb))
+- **forgebook:** let the stop hook end a loop on a React stack ([769de5cf](https://github.com/ensiria/forgebook/commit/769de5cf))
+- **forgebook:** know init's own pre-commit hook when set up again ([167ddb02](https://github.com/ensiria/forgebook/commit/167ddb02))
+- **forgebook:** answer --version, so the commit hook runs verify ([8ba0b6e5](https://github.com/ensiria/forgebook/commit/8ba0b6e5))
+- **forgebook:** keep verify's base worktree off a git hook's index ([debfa380](https://github.com/ensiria/forgebook/commit/debfa380))
+- **forgebook:** keep the page's search under its weight ([ae6eb261](https://github.com/ensiria/forgebook/commit/ae6eb261))
+- **forgebook:** follow namespaces, requires and renamed exports in audit ([9330d3c2](https://github.com/ensiria/forgebook/commit/9330d3c2))
+- **shell:** word the page's load error with a phrase the shell already holds ([bcbd533f](https://github.com/ensiria/forgebook/commit/bcbd533f))
+- **forgebook:** declare the type again where a theme sets the frame box's fonts ([cad9d4fe](https://github.com/ensiria/forgebook/commit/cad9d4fe))
+- **forgebook:** filter the tree in the render that checks a tag ([a8471a3b](https://github.com/ensiria/forgebook/commit/a8471a3b))
+- **forgebook:** give the stage its frame on React 18 ([eb3f6ceb](https://github.com/ensiria/forgebook/commit/eb3f6ceb))
+- **forgebook:** give a command server's frames any free port ([c70e8d8d](https://github.com/ensiria/forgebook/commit/c70e8d8d))
+- **forgebook:** give each live command server a cache folder of its own ([e9df5f2f](https://github.com/ensiria/forgebook/commit/e9df5f2f))
+- **forgebook:** make forgebook migrate safe to run and honest to read ([ebbb11b4](https://github.com/ensiria/forgebook/commit/ebbb11b4))
+- **shell:** say to reload in the page's load error instead of a button ([5c6ea043](https://github.com/ensiria/forgebook/commit/5c6ea043))
+- **shell:** offer a reload when a page's code cannot be fetched ([c11d69e8](https://github.com/ensiria/forgebook/commit/c11d69e8))
+- **forgebook:** hear a git switch the system's file events miss ([33d1c218](https://github.com/ensiria/forgebook/commit/33d1c218))
+- **forgebook:** keep other projects' browsers when installing one ([0fb62b7b](https://github.com/ensiria/forgebook/commit/0fb62b7b))
+- **forgebook:** compile only the catalogue's own .js modules' JSX ([426f0598](https://github.com/ensiria/forgebook/commit/426f0598))
+- **forgebook:** name a component that does not parse among the problems ([fb3ce85c](https://github.com/ensiria/forgebook/commit/fb3ce85c))
+- **forgebook:** name the catalogue's folder as Vite names its root ([8958ec6d](https://github.com/ensiria/forgebook/commit/8958ec6d))
+- **forgebook:** read a story's code without running away on spreads ([c456fa5d](https://github.com/ensiria/forgebook/commit/c456fa5d))
+- **forgebook:** read every variant's props, and say why a type is unread ([ddf08ea5](https://github.com/ensiria/forgebook/commit/ddf08ea5))
+- **forgebook:** read a map's absolute source as written on Windows ([468b7f5d](https://github.com/ensiria/forgebook/commit/468b7f5d))
+- **forgebook:** give a story error's stack the lines as written ([8b8e6bbd](https://github.com/ensiria/forgebook/commit/8b8e6bbd))
+- **forgebook:** keep the dependency scan going past a broken component ([c4ecbba9](https://github.com/ensiria/forgebook/commit/c4ecbba9))
+- **forgebook:** find hidden story folders the same way on every Node ([f5f31fc2](https://github.com/ensiria/forgebook/commit/f5f31fc2))
+- **forgebook:** answer not verified on a story pattern that matches nothing ([7b506661](https://github.com/ensiria/forgebook/commit/7b506661))
+- **forgebook:** name the story files a pattern passes over in a hidden folder ([3230214c](https://github.com/ensiria/forgebook/commit/3230214c))
+- **forgebook:** name the commit's hook from the repository as Windows does ([a724cc96](https://github.com/ensiria/forgebook/commit/a724cc96))
+- **forgebook:** keep the way out of a list a tag emptied ([8a61cca2](https://github.com/ensiria/forgebook/commit/8a61cca2))
+- **forgebook:** start none of the app's plugins' processes for a one-shot command ([adc323fe](https://github.com/ensiria/forgebook/commit/adc323fe))
+- **forgebook:** end a one-shot command though a plugin left something running ([991552af](https://github.com/ensiria/forgebook/commit/991552af))
+- **forgebook:** widen the React peer and keep only Vite as a dependency ([c6522c2f](https://github.com/ensiria/forgebook/commit/c6522c2f))
+- **forgebook:** stop on a vite.config running an older Vite ([01e94ca8](https://github.com/ensiria/forgebook/commit/01e94ca8))
+- **testing:** keep Vite a dependency, and say what a plugin's view needs ([9e140371](https://github.com/ensiria/forgebook/commit/9e140371))
+- **forgebook:** read colours on an object's line, and leave more alone ([44283e5b](https://github.com/ensiria/forgebook/commit/44283e5b))
+- **forgebook:** keep the app's plugins to what a catalogue takes of an app ([a32baddb](https://github.com/ensiria/forgebook/commit/a32baddb))
+- **forgebook:** bring Forgebook's own Vite and React ([56dca767](https://github.com/ensiria/forgebook/commit/56dca767))
+- **forgebook:** keep what the app's plugins log off a command's stdout ([3fb5a45f](https://github.com/ensiria/forgebook/commit/3fb5a45f))
+- **forgebook:** read a Storybook link's path, and say what a plain framework drops ([00c782af](https://github.com/ensiria/forgebook/commit/00c782af))
+- **forgebook:** keep a person's choice in the search's list ([8e0d4435](https://github.com/ensiria/forgebook/commit/8e0d4435))
+- **forgebook:** remove trailing runs without an anchored pattern ([3b693c6d](https://github.com/ensiria/forgebook/commit/3b693c6d))
+- **forgebook:** keep the canvas behind a story's frame transparent ([5f8db1fc](https://github.com/ensiria/forgebook/commit/5f8db1fc))
+- **forgebook:** bring a choice into sight when its radio takes the focus ([5290ad3e](https://github.com/ensiria/forgebook/commit/5290ad3e))
+- **forgebook:** keep the appearance panel inside the sidebar ([a5816ccd](https://github.com/ensiria/forgebook/commit/a5816ccd))
+- **forgebook:** give a plugin's second frame only checked values ([74a1d1b2](https://github.com/ensiria/forgebook/commit/74a1d1b2))
+- **shell:** keep the appearance menu whole inside the sidebar ([7acb732d](https://github.com/ensiria/forgebook/commit/7acb732d))
+- **forgebook:** keep a plugin aside's values while the docs load ([9cec9af6](https://github.com/ensiria/forgebook/commit/9cec9af6))
+- **forgebook:** stop on a configuration or link that cannot be read ([cf3ce801](https://github.com/ensiria/forgebook/commit/cf3ce801))
+- **forgebook:** replace every star of a path alias's target ([602b56bc](https://github.com/ensiria/forgebook/commit/602b56bc))
+- **forgebook:** keep the catalogue drawing past a broken story file ([4bd1ab5b](https://github.com/ensiria/forgebook/commit/4bd1ab5b))
+- **shell:** fix what axe and a keyboard find in the shell ([e6497fb8](https://github.com/ensiria/forgebook/commit/e6497fb8))
+
+### 🔥 Performance
+
+- **vite:** build docs programs from what the stories reach ([0b9904c7](https://github.com/ensiria/forgebook/commit/0b9904c7))
+- **vite:** walk only the folders a story pattern can match ([acfa48f8](https://github.com/ensiria/forgebook/commit/acfa48f8))
+- **forgebook:** keep the texts only the later parts read out of the first load ([de1d62b1](https://github.com/ensiria/forgebook/commit/de1d62b1))
+- **forgebook:** write a group's stories as rows only from 300 stories ([f634830a](https://github.com/ensiria/forgebook/commit/f634830a))
+- **forgebook:** name the frame's ref prop frame ([5fc304b7](https://github.com/ensiria/forgebook/commit/5fc304b7))
+- **shell:** read the composed catalogues from the page, not the shell's props ([f077f1d4](https://github.com/ensiria/forgebook/commit/f077f1d4))
+- **forgebook:** hand the tag filter over from its button's chunk ([c456af82](https://github.com/ensiria/forgebook/commit/c456af82))
+- **forgebook:** rebuild a story's object from its row in fewer bytes ([4678b879](https://github.com/ensiria/forgebook/commit/4678b879))
+- **forgebook:** stop at the first file when telling a pattern matches ([4eef003f](https://github.com/ensiria/forgebook/commit/4eef003f))
+- **forgebook:** scan a first start's dependencies quickly, carefully on failure ([a94c52e2](https://github.com/ensiria/forgebook/commit/a94c52e2))
+- **forgebook:** declare the shell's type and focus ring once on the root ([db453279](https://github.com/ensiria/forgebook/commit/db453279))
+- **forgebook:** write a group's stories as rows in its index ([4b183e0a](https://github.com/ensiria/forgebook/commit/4b183e0a))
+- **shell:** resolve a composed story only where the build keeps composition ([8c252fa2](https://github.com/ensiria/forgebook/commit/8c252fa2))
+- **shell:** keep composition's leftovers off a composing-free first load ([62ea21ae](https://github.com/ensiria/forgebook/commit/62ea21ae))
+- **shell:** leave composition out of a catalogue that composes none ([5a95a304](https://github.com/ensiria/forgebook/commit/5a95a304))
+- **shell:** fit the reload button and the hidden counts in the budget ([1dbee39d](https://github.com/ensiria/forgebook/commit/1dbee39d))
+- **shell:** write an example's code only once it is shown ([b43e1ee6](https://github.com/ensiria/forgebook/commit/b43e1ee6))
+- **forgebook:** load a frame's play runner with the first play ([6c684a90](https://github.com/ensiria/forgebook/commit/6c684a90))
+- **forgebook:** read a prop's shapes and a library's imports with less work ([0557851d](https://github.com/ensiria/forgebook/commit/0557851d))
+- **forgebook:** leave the catalogue's own CSS out of the forced states ([2df5ce74](https://github.com/ensiria/forgebook/commit/2df5ce74))
+- **forgebook:** pack a build's story-file texts together ([6f9f9d49](https://github.com/ensiria/forgebook/commit/6f9f9d49))
+- **forgebook:** run the app's PostCSS once when Vite already runs it ([6ca0d5bc](https://github.com/ensiria/forgebook/commit/6ca0d5bc))
+- **forgebook:** show the first search result without the 300 ms hold ([d4a36d75](https://github.com/ensiria/forgebook/commit/d4a36d75))
+- **forgebook:** show the tag filter the moment its code arrives ([73077b60](https://github.com/ensiria/forgebook/commit/73077b60))
+- **forgebook:** load the Signature tab's reference with a logic story ([252d30f4](https://github.com/ensiria/forgebook/commit/252d30f4))
+
+### ⚠️  Breaking Changes
+
+- **forgebook:** let a reader keep a story's play from running on open  ([e5832e6d](https://github.com/ensiria/forgebook/commit/e5832e6d))
+  a built catalogue no longer runs plays when a story opens;
+  write play: "on" in the configuration to keep the old behaviour.
+- **forgebook:** list the panel's props in the order the source declares them  ([4073372a](https://github.com/ensiria/forgebook/commit/4073372a))
+  the strings propGroups.choice, .text, .structured and .toggle are
+  gone with their headings.
+- **forgebook:** fail verify on a published component agents cannot see  ([adb9d6ba](https://github.com/ensiria/forgebook/commit/adb9d6ba))
+  verify exits non-zero on a changed published component
+  agents cannot see, where it passed before.
+- **forgebook:** check what a change reuses against what exists  ([ba7d39f5](https://github.com/ensiria/forgebook/commit/ba7d39f5))
+  check-code and verify can fail on duplicate-component in a
+  project with no tags, and the document's `checked` holds two more rules.
+- **forgebook:** read the design system the application already has  ([ef13b397](https://github.com/ensiria/forgebook/commit/ef13b397))
+  a catalogue with no tokens file whose application declares a
+  palette now gets raw-color and raw-size problems, so check-code and verify can
+  fail where they passed. Values in emails, generated social images, drawings,
+  canvases and masks are no longer compared, with a tokens file either.
+- **forgebook:** make verify unable to pass on nothing  ([05478180](https://github.com/ensiria/forgebook/commit/05478180))
+  verify exits non-zero on a changed UI file with no story
+  that ran, and its JSON is schema 2: verdict, summary, skipped, base,
+  variants, uiFiles, storyCount, ran, failures, code. reports is gone.
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.3.0
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.3.3 (2026-11-06)
 
 ### 🩹 Fixes

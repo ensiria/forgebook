@@ -1,3 +1,39 @@
+## 0.2.5 (2026-11-08)
+
+### 🚀 Features
+
+- **forgebook:** try a story's states nobody wrote, with no story written ([bc6edcb9](https://github.com/ensiria/forgebook/commit/bc6edcb9))
+- **forgebook:** prove a pull request's states from CI, with nothing stored ([67c87151](https://github.com/ensiria/forgebook/commit/67c87151))
+- **forgebook:** set up a project's coding agents with init ([784cdd96](https://github.com/ensiria/forgebook/commit/784cdd96))
+- **forgebook:** wait for what a story loads before a frame says ready ([a730e02f](https://github.com/ensiria/forgebook/commit/a730e02f))
+- ⚠️  **forgebook:** make verify unable to pass on nothing ([05478180](https://github.com/ensiria/forgebook/commit/05478180))
+
+### 🩹 Fixes
+
+- **testing:** wait for a frame whose root a reload took away ([5c901d27](https://github.com/ensiria/forgebook/commit/5c901d27))
+- **testing:** retry a failed story test twice in CI ([b198624d](https://github.com/ensiria/forgebook/commit/b198624d))
+- **forgebook:** keep other projects' browsers when installing one ([0fb62b7b](https://github.com/ensiria/forgebook/commit/0fb62b7b))
+- **testing:** keep Vite a dependency, and say what a plugin's view needs ([9e140371](https://github.com/ensiria/forgebook/commit/9e140371))
+- **forgebook:** bring Forgebook's own Vite and React ([56dca767](https://github.com/ensiria/forgebook/commit/56dca767))
+- **testing:** remove a model address's trailing slashes without a pattern ([986900a9](https://github.com/ensiria/forgebook/commit/986900a9))
+- **forgebook:** keep the catalogue drawing past a broken story file ([4bd1ab5b](https://github.com/ensiria/forgebook/commit/4bd1ab5b))
+
+### ⚠️  Breaking Changes
+
+- **forgebook:** make verify unable to pass on nothing  ([05478180](https://github.com/ensiria/forgebook/commit/05478180))
+  verify exits non-zero on a changed UI file with no story
+  that ran, and its JSON is schema 2: verdict, summary, skipped, base,
+  variants, uiFiles, storyCount, ran, failures, code. reports is gone.
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.3.0
+- Updated forgebook to 0.4.0
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.2.4 (2026-11-06)
 
 ### 🧱 Updated Dependencies
