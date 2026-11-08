@@ -1083,6 +1083,19 @@ describe("forgebook with no tokens file", { timeout: SERVER_TIMEOUT }, () => {
     expect(forgebook(config, ["tokens", "--json"]).exitCode).toBe(0);
   });
 
+  it("names a token that comes to nothing, and checks no change until it is fixed", () => {
+    const broken = System.replace("--brand: #ff0033;", "--brand: var(--brand-base);");
+    const config = appProject("app-unresolved", broken);
+    const tokens = forgebook(config, ["tokens", "--json"]);
+    expect(tokens.exitCode).not.toBe(0);
+    expect(JSON.parse(tokens.stdout).problems).toEqual([
+      "src/a.css:1: --brand reads var(--brand-base), which nothing declares, so a browser gives it no value: declare --brand-base or give it a fallback"
+    ]);
+    const check = forgebook(config, ["check-code", "--json"]);
+    expect(check.exitCode).not.toBe(0);
+    expect(check.stderr).toContain("--brand reads var(--brand-base)");
+  });
+
   it("does not take a brand colour and little else for a palette", () => {
     const config = appProject("app-small", ":root { --brand: #ff0033; }\n");
     writeFileSync(

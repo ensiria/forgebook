@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { failuresOf, HAS_STATUS, hasGivenUp, storiesOfDocument } from "./sweep.ts";
+import { failuresOf, HAS_STATUS, hasGivenUp, storiesOfDocument, sweepProblems } from "./sweep.ts";
 
 /** The wait's expression, run on a frame with this status, or with no root at all, as a page runs it. */
 const hasStatus = (status: string | null | undefined): unknown =>
@@ -74,6 +74,33 @@ describe("failuresOf", () => {
     expect(failures).toEqual([
       { reason: "line N failed", stories: 2, example: "b" },
       { reason: "other", stories: 1, example: "a" }
+    ]);
+  });
+});
+
+describe("sweepProblems", () => {
+  const upstream = ["s:grid--min-max", "s:grid--static"];
+
+  it("passes a run whose only failures fail in the library's own Storybook too", () => {
+    expect(sweepProblems({ listed: 10, notDrawn: upstream }, 10, upstream)).toEqual([]);
+  });
+
+  it("counts every other story that did not draw", () => {
+    expect(sweepProblems({ listed: 10, notDrawn: ["s:a--b", ...upstream] }, 10, upstream)).toEqual([
+      "1 of 10 stories did not draw"
+    ]);
+  });
+
+  it("fails a run where a story said to fail in Storybook drew, so the definition is corrected", () => {
+    expect(sweepProblems({ listed: 10, notDrawn: ["s:grid--static"] }, 10, upstream)).toEqual([
+      "s:grid--min-max drew, though the definition says it fails in Storybook"
+    ]);
+  });
+
+  it("still counts the stories not listed, and those listed beyond the count", () => {
+    expect(sweepProblems({ listed: 8, notDrawn: [] }, 10, [])).toEqual(["2 of 10 stories were not listed"]);
+    expect(sweepProblems({ listed: 11, notDrawn: [] }, 10, [])).toEqual([
+      "1 stories were listed beyond the 10 expected"
     ]);
   });
 });
