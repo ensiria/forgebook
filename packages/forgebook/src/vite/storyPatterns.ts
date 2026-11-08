@@ -183,23 +183,69 @@ const folderEntries = (root: string, folder: string): readonly Dirent[] => {
  * @param root - the folder the pattern is relative to.
  * @param pattern - the pattern, without a `!`.
  */
-const hasMatchingFile = (root: string, pattern: string): boolean => {
+export const hasMatchingFile = (root: string, pattern: string): boolean => {
   const plain = pattern.replace(/^(?:\.\/)+/, "");
   const isDependencyNamed = pattern.includes(DEPENDENCIES);
   // the glob enters no hidden folder (`.git`) unless the pattern names one, and nor does the walk
   const isHiddenNamed = plain.split("/").some((segment) => segment.startsWith(".") && segment !== "..");
   const isWalked = (entry: Dirent): boolean =>
     (isDependencyNamed || entry.name !== DEPENDENCIES) && (isHiddenNamed || !entry.name.startsWith("."));
+  const shape = patternShape(plain);
   const folders = [patternBase(plain)];
   while (folders.length > 0) {
     const folder = folders.pop() ?? "";
     for (const entry of folderEntries(root, folder)) {
       const path = folder === "" ? entry.name : `${folder}/${entry.name}`;
-      if (entry.isFile() && posix.matchesGlob(path, plain)) return true;
-      if (entry.isDirectory() && isWalked(entry)) folders.push(path);
+      if (entry.isFile() && shape.isFileDepth(path) && posix.matchesGlob(path, plain)) return true;
+      if (entry.isDirectory() && isWalked(entry) && shape.couldHold(path)) folders.push(path);
     }
   }
   return false;
+};
+
+/** Whether a pattern has a `/` inside a group (`{a,b/c}`, `@(a|b/c)`), which splitting it at its slashes would cut. */
+const hasSlashInGroup = (pattern: string): boolean => {
+  let depth = 0;
+  for (const character of pattern) {
+    if (character === "{" || character === "(") depth += 1;
+    else if ((character === "}" || character === ")") && depth > 0) depth -= 1;
+    else if (character === "/" && depth > 0) return true;
+  }
+  return false;
+};
+
+/** Where in the tree a pattern's files can be, so the walk reads no folder and tests no file the glob would not. */
+type PatternShape = {
+  /** Whether a folder may hold a matching file: its path matches as many of the pattern's segments as it has. */
+  readonly couldHold: (folder: string) => boolean;
+  /** Whether a file is as deep as the pattern's files are, before its name is matched. */
+  readonly isFileDepth: (file: string) => boolean;
+};
+
+/**
+ * Where a pattern's files can be. Without it the walk reads every folder under the pattern's static one and matches
+ * every file there: in a monorepo whose pattern names packages by a group (`packages/@{a,b}/*\/stories/*`), that is
+ * every package's sources, most of a second, longer than the full listing the walk is there to spare. A pattern with
+ * `**` reaches any depth past it; one with a `/` inside a group cannot be cut at its slashes, and lets everything through.
+ *
+ * @param pattern - the pattern, without a `!` or a leading `./`.
+ */
+const patternShape = (pattern: string): PatternShape => {
+  if (hasSlashInGroup(pattern)) return { couldHold: () => true, isFileDepth: () => true };
+  const segments = pattern.split("/");
+  const globstar = segments.indexOf("**");
+  const isAnyDepth = (depth: number): boolean => globstar !== -1 && globstar < depth;
+  return {
+    couldHold: (folder: string): boolean => {
+      const depth = folder.split("/").length;
+      if (isAnyDepth(depth)) return true;
+      return depth < segments.length && posix.matchesGlob(folder, segments.slice(0, depth).join("/"));
+    },
+    isFileDepth: (file: string): boolean => {
+      const depth = file.split("/").length;
+      return isAnyDepth(depth) || depth === segments.length;
+    }
+  };
 };
 
 /** Whether a configuration's list has something in it. */
