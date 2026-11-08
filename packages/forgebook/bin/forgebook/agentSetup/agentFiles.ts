@@ -297,6 +297,16 @@ const writePreCommit = (root: string, command: string, done: Written): WrittenHo
   );
   const folder = other === undefined ? gitHooksFolder(root) : undefined;
   const file = folder === undefined ? undefined : join(folder, "pre-commit");
+  // set up again, a hook that already runs verify (an earlier run's) is this one's own, not a setup of the repository's
+  if (
+    file !== undefined &&
+    lstatSync(file, { throwIfNoEntry: false })?.isFile() === true &&
+    OWN_PRE_COMMIT.test(readIfThere(file) ?? "")
+  ) {
+    const shown = VITE_PATHS.normalize(relative(realpathSync.native(root), file));
+    done.unchanged.push(shown);
+    return { name: "pre-commit", file: shown, effect: "blocks-commit" };
+  }
   const isTaken =
     file === undefined ||
     existsSync(file) ||
