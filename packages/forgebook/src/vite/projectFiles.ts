@@ -2,7 +2,8 @@
  * The files of a project a static reading takes: its styles and components, what git knows of them, inside the repository.
  *
  * @remarks
- * Shared by what reads a whole project without a catalogue (`forgebook audit`) and by `check-code`. A tracked link may lead
+ * Shared by what reads a whole project without a catalogue (`forgebook audit`) and by `check-code`; the audit also reads
+ * the scripts, which import components and hold stories. A tracked link may lead
  * anywhere, and a repository may hold more than memory, so both are bounded here and said in `notes`.
  *
  * @module
@@ -73,21 +74,51 @@ export const listedProjectFiles = (dir: string, notes: string[]): string[] => {
   return listed.slice(0, MOST_FILES).filter((file) => isInside(root, join(dir, file)));
 };
 
-/**
- * Reads a project's files.
- *
- * @param dir - its folder.
- * @param notes - told of what is left out.
- */
-export const projectFiles = (dir: string, notes: string[]): ProjectFile[] => {
+/** Reads listed files, up to the bytes a report reads, and says when it stops. */
+const readFiles = (dir: string, listed: readonly string[], notes: string[]): ProjectFile[] => {
   let bytes = 0;
-  const read = listedProjectFiles(dir, notes).flatMap((file) => {
+  const read = listed.flatMap((file) => {
     const text = bytes > MOST_BYTES ? undefined : smallFileText(join(dir, file));
     bytes += text?.length ?? 0;
     return text === undefined ? [] : [{ file, text }];
   });
   if (bytes > MOST_BYTES) notes.push(`files past the first ${MOST_BYTES} bytes not read`);
   return read;
+};
+
+/**
+ * Reads a project's files.
+ *
+ * @param dir - its folder.
+ * @param notes - told of what is left out.
+ */
+export const projectFiles = (dir: string, notes: string[]): ProjectFile[] =>
+  readFiles(dir, listedProjectFiles(dir, notes), notes);
+
+/** The scripts git is asked for: what may import a component or hold a story, with no markup of its own. */
+const SCRIPT_PATTERNS: readonly string[] = ["*.ts", "*.mts", "*.cts", "*.js", "*.mjs", "*.cjs"];
+
+/** The same, for a file's name; a type declaration imports nothing that runs. */
+const SCRIPT_FILE = /(?<!\.d)\.[cm]?[jt]s$/;
+
+/**
+ * Reads a project's scripts, the files {@link projectFiles} leaves out, under the same bounds.
+ *
+ * @param dir - its folder.
+ * @param notes - told of what is left out.
+ */
+export const projectScripts = (dir: string, notes: string[]): ProjectFile[] => {
+  const root = repositoryOf(dir);
+  const listed = listedFiles(dir, SCRIPT_PATTERNS, SCRIPT_FILE, NOT_ITS_CODE).filter(
+    (file) => SCRIPT_FILE.test(file) && !NOT_ITS_CODE.test(file)
+  );
+  if (listed.length > MOST_FILES)
+    notes.push(`${listed.length - MOST_FILES} scripts past the first ${MOST_FILES} not read`);
+  return readFiles(
+    dir,
+    listed.slice(0, MOST_FILES).filter((file) => isInside(root, join(dir, file))),
+    notes
+  );
 };
 
 /**

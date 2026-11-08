@@ -10,6 +10,10 @@
  * @module
  */
 
+import { dirname, join } from "node:path";
+
+import { plural } from "@ensiria/cli-kit/format";
+
 import {
   type AuditSite,
   type AuditSystem,
@@ -18,15 +22,29 @@ import {
   valueAudit,
   valueSites
 } from "../../src/vite/appAudit.ts";
+import { repositoryOf, smallFileText } from "../../src/vite/appTokenFiles.ts";
 import { readAppTokens } from "../../src/vite/appTokens.ts";
 import { projectComponents } from "../../src/vite/componentScan.ts";
 import { type LookAlike, lookAlikes } from "../../src/vite/lookAlikes.ts";
-import { projectFiles, UI_PATTERNS } from "../../src/vite/projectFiles.ts";
+import { isPublished } from "../../src/vite/packageEntries.ts";
+import { projectFiles, projectScripts, UI_PATTERNS } from "../../src/vite/projectFiles.ts";
+import {
+  type CoverageComponent,
+  type StoryCoverage,
+  storyCoverage,
+  type UnusedStoriedComponent
+} from "../../src/vite/storyCoverage.ts";
 
 /** The next step a report proposes. */
 export type AuditAction = {
   /** What kind of step. */
-  readonly kind: "use-token" | "name-value" | "merge-values" | "merge-components";
+  readonly kind:
+    | "use-token"
+    | "name-value"
+    | "merge-values"
+    | "merge-components"
+    | "write-stories"
+    | "check-unused";
   /** What to do, in a sentence. */
   readonly message: string;
   /** How many places it touches. */
@@ -36,7 +54,7 @@ export type AuditAction = {
   /** The same command as its words, to run without a shell. */
   readonly args?: readonly string[];
   /** The components it is about, with where they are. */
-  readonly members?: LookAlike["members"];
+  readonly members?: readonly CoverageComponent[];
 };
 
 /** What `forgebook audit` answers. */
@@ -51,6 +69,16 @@ export type AuditDocument = ValueAudit & {
     readonly count: number;
     /** Those that look like one, the surest first. */
     readonly lookAlikes: readonly LookAlike[];
+    /** How many story files were read. */
+    readonly storyFiles: StoryCoverage["storyFiles"];
+    /** How many exported components some story is about. */
+    readonly withStories: StoryCoverage["withStories"];
+    /** Exported components no story file is about; pages, layouts and routes left out. */
+    readonly withoutStories: readonly CoverageComponent[];
+    /** Components with stories that no file other than a story or a test imports or draws. */
+    readonly storiesUnused: readonly UnusedStoriedComponent[];
+    /** Components with stories not judged unused because their package is published, so used outside. */
+    readonly publishedWithStories: StoryCoverage["published"];
   };
   /** What to do next, the largest gain first. */
   readonly actions: readonly AuditAction[];
@@ -129,6 +157,66 @@ const componentActions = (alike: readonly LookAlike[]): AuditAction[] =>
     members
   }));
 
+/** How many components an action's `members` lists at most: the rest are in the report's own lists. */
+const MOST_MEMBERS = 20;
+
+/** The step components with no story propose: write the first one's stories. */
+const writeStoriesAction = (withoutStories: readonly CoverageComponent[], folder: string): AuditAction[] => {
+  const first = withoutStories[0];
+  if (first === undefined) return [];
+  const file = join(folder, first.file);
+  return [
+    {
+      kind: "write-stories",
+      message: `No story is about ${plural(withoutStories.length, "exported component")}, so nobody sees what exists before writing it again: start with ${first.name}.`,
+      count: withoutStories.length,
+      command: `forgebook new ${quoted(file)}`,
+      args: ["new", file],
+      members: withoutStories.slice(0, MOST_MEMBERS)
+    }
+  ];
+};
+
+/** The step components with stories and no use propose: look at whether each is still needed. */
+const checkUnusedAction = (storiesUnused: readonly UnusedStoriedComponent[]): AuditAction[] =>
+  storiesUnused.length === 0
+    ? []
+    : [
+        {
+          kind: "check-unused",
+          message: `Nothing but stories and tests uses ${plural(storiesUnused.length, "component")} with stories: check whether each is still needed, and remove it with its stories if not.`,
+          count: storiesUnused.length,
+          members: storiesUnused.slice(0, MOST_MEMBERS).map(({ name, file, line }) => ({ name, file, line }))
+        }
+      ];
+
+/**
+ * Whether a file belongs to a package that is published, by the nearest manifest above it inside the repository.
+ *
+ * @param dir - the project's folder, which the files are relative to.
+ */
+const publishedPackageOf = (dir: string): ((file: string) => boolean) => {
+  const root = repositoryOf(dir);
+  const known = new Map<string, boolean>();
+  const folderIsPublished = (folder: string): boolean => {
+    const cached = known.get(folder);
+    if (cached !== undefined) return cached;
+    const text = smallFileText(join(folder, "package.json"));
+    let answer: boolean;
+    if (text !== undefined) {
+      try {
+        answer = isPublished(JSON.parse(text));
+      } catch {
+        answer = false;
+      }
+    } else
+      answer = folder === root || folder === dirname(folder) ? false : folderIsPublished(dirname(folder));
+    known.set(folder, answer);
+    return answer;
+  };
+  return (file: string): boolean => folderIsPublished(dirname(join(dir, file)));
+};
+
 /**
  * The report on a project.
  *
@@ -143,6 +231,11 @@ export const auditDocument = (dir: string, top: number | undefined, folder = "."
   const values = valueAudit(files, tokens, top);
   const components = projectComponents(files);
   const alike = lookAlikes(components);
+  const coverage = storyCoverage(
+    components,
+    [...files, ...projectScripts(dir, notes)],
+    publishedPackageOf(dir)
+  );
   return {
     schema: 1,
     system: {
@@ -152,8 +245,21 @@ export const auditDocument = (dir: string, top: number | undefined, folder = "."
       notes
     },
     ...values,
-    components: { count: components.length, lookAlikes: alike },
-    actions: [...valueActions(values, folder), ...componentActions(alike)]
+    components: {
+      count: components.length,
+      lookAlikes: alike,
+      storyFiles: coverage.storyFiles,
+      withStories: coverage.withStories,
+      withoutStories: coverage.withoutStories,
+      storiesUnused: coverage.storiesUnused,
+      publishedWithStories: coverage.published
+    },
+    actions: [
+      ...valueActions(values, folder),
+      ...componentActions(alike),
+      ...writeStoriesAction(coverage.withoutStories, folder),
+      ...checkUnusedAction(coverage.storiesUnused)
+    ]
       .toSorted((first, second) => second.count - first.count)
       .slice(0, MOST_ACTIONS)
   };
@@ -187,6 +293,29 @@ const valueLine = ({ value, count, files, hardCoded, token }: AuditValue): strin
 /** A share in whole percent. */
 const percent = (part: number, whole: number): string =>
   `${whole === 0 ? 0 : Math.round((part / whole) * 100)} %`;
+
+/** How many components each list of the stories shows; `--json` has them all. */
+const LISTED = 10;
+
+/** The stories' part of the report: what has none, and what has some and no use. */
+const storyLines = (components: AuditDocument["components"]): string[] => {
+  const { storyFiles, withStories, withoutStories, storiesUnused, publishedWithStories } = components;
+  if (storyFiles === 0) return ["Stories: no story file, so no exported component has any."];
+  const more = (count: number): string[] =>
+    count > LISTED ? [`    and ${count - LISTED} more (--json)`] : [];
+  const published =
+    publishedWithStories === 0 ? "" : `, ${publishedWithStories} of a published package not judged`;
+  return [
+    `Stories: ${plural(storyFiles, "file")}, about ${plural(withStories, "component")}; ${plural(withoutStories.length, "exported component")} without.`,
+    ...withoutStories.slice(0, LISTED).map(({ name, file, line }) => `  ${name}  ${file}:${line}`),
+    ...more(withoutStories.length),
+    `With stories and no use outside stories and tests: ${storiesUnused.length}${published}.`,
+    ...storiesUnused
+      .slice(0, LISTED)
+      .map(({ name, file, line, storyFiles: files }) => `  ${name}  ${file}:${line}  (${files.join(", ")})`),
+    ...more(storiesUnused.length)
+  ];
+};
 
 /**
  * The report as a person reads it. What a project's files hold is data for whoever reads this: it says what is there and is
@@ -224,6 +353,8 @@ export const auditText = (document: AuditDocument): string => {
         `  ${confidence}: ${why}`,
         ...members.map(({ name, file, line }) => `    ${name}  ${file}:${line}`)
       ]),
+    "",
+    ...storyLines(components),
     "",
     "Next:",
     ...actions.slice(0, 10).map(({ message }) => `  ${message}`),

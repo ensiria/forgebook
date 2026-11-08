@@ -1362,7 +1362,7 @@ is a state of the component: the same).
 | `forgebook find` | Finds components by what they are for, in your own words |
 | `forgebook search` | Searches the whole catalogue by its text: docs pages, props, descriptions, stories and names, with the address of each match |
 | `forgebook graph` | A map of the components and tokens, generated from the source: what exists, what each is for, how to choose |
-| `forgebook audit` | The colours, sizes and components a project actually uses, with no catalogue |
+| `forgebook audit` | The colours, sizes and components a project actually uses, and the components with no story or no use, with no catalogue |
 | `forgebook tokens` | The design tokens, one of them, or the token nearest a value (`--nearest "#1c1b1b"`) |
 | `forgebook check-code` | Checks what a change adds against the design system, with an exit code for CI |
 | `forgebook init --agents` | What a project's coding agents need too: `.mcp.json`, instructions and skill, CI, a hook running `verify`; `--browser` installs the testing package and its browser, `--draw` draws a story ([more](#set-a-project-up-in-one-prompt)) |
@@ -1941,8 +1941,12 @@ what, token counts; `--component Button` adds what renders it and the tokens its
 `forgebook audit` reports what a project actually uses, read from its files, with no catalogue, no configuration and no code
 run: `37 greys, 5 used 90 % of the time`. It is for a project with no design system as much as one with: colours in any
 notation counted as one, how many go through tokens and how many are written by hand, sizes by what they are for, and
-components that look like one, by name and by what they render, take and carry, never by name alone. It exits 0: it is a
-report, and `check-code` is what fails. With `--json`, `actions` lists the next steps, the largest first, each with the
+components that look like one, by name and by what they render, take and carry, never by name alone. It also says where
+a catalogue rots: exported components no story file imports (`withoutStories`), and components with stories that nothing
+but stories and tests imports or draws (`storiesUnused`), each with its story files. Pages, layouts and routes are in
+neither list, and a published package's components are never called unused, since their users are elsewhere. An import it
+cannot follow (a barrel, an alias, a package's name) counts for every component of that name, so a listed component is one
+nothing in the project could be. It exits 0: it is a report, and `check-code` is what fails. With `--json`, `actions` lists the next steps, the largest first, each with the
 command that lists what to edit:
 
 ```sh
@@ -1951,6 +1955,8 @@ npx forgebook audit --value "#64748b" --json   # every line that writes it by ha
 ```
 
 It does not read a tokens file a catalogue names, only what the application declares, and a `.js` file's JSX is not read.
+A component a framework registers by its folder (Nuxt's `<BaseButton>` for `components/base/Button.vue`) is matched only by
+its own name, so it can be listed as unused.
 
 `forgebook verify` and `verify` are what an agent runs before saying a change is done, and what a pull request's workflow
 runs. A change cannot pass on nothing:
