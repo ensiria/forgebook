@@ -88,6 +88,8 @@ export type Manifest = {
   readonly peerDependencies: Readonly<Record<string, string>>;
   /** The ranges it installs itself. */
   readonly dependencies: Readonly<Record<string, string>>;
+  /** The versions it develops with: what a fixture pins of the tools it runs on. */
+  readonly devDependencies: Readonly<Record<string, string>>;
 };
 
 /** What the npm registry says of a package: every version it published and its dist-tags. */
