@@ -102,7 +102,10 @@ export type CloseWatchOptions = {
  * @param file - the file.
  * @param onEvent - the watch's events.
  */
-const nodeWatchFile: WatchFile = (file: string, onEvent: (kind: "change" | "rename" | "error") => void) => {
+export const nodeWatchFile: WatchFile = (
+  file: string,
+  onEvent: (kind: "change" | "rename" | "error") => void
+) => {
   const watcher: FSWatcher = watch(file, { persistent: false }, (kind: string) =>
     onEvent(kind === "rename" ? "rename" : "change")
   );

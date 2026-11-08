@@ -12,7 +12,7 @@ its API.
 
 An edit you save reaches the open story at once, a story file's in tens of milliseconds. One that the open story does
 not show may not have reached the dev server: in a container, a Windows drive under WSL or a network drive, run it
-with `forgebook dev --poll`.
+with `forgebook dev --poll`. After `git switch` the dev server lists the branch's stories without a restart.
 
 A client that renders MCP Apps also gets `story_preview`, which shows a story to the person, live, inside the conversation.
 You do not see what it shows: to look at a story yourself, use `shot` (`story_shot`). Where the tool is not listed, the

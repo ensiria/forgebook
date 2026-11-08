@@ -187,13 +187,27 @@ describe("the environment", () => {
       expect(module).not.toContain("PUBLIC_RETRIES");
     }
     expect(await loaded(configured({}, join(FIXTURES, "kit3"), 2), "$app/env/public")).toContain(
-      "is SvelteKit 3's"
+      "this project gives them through"
     );
     const rewritten = namedServerImports('import { PUBLIC_A } from "$env/static/public";') ?? "";
     expect(rewritten).toContain('"$env/static/public?names=PUBLIC_A"');
     expect(await loaded(kit3, "$env/static/public?names=PUBLIC_A")).toContain(
       "export const PUBLIC_A = undefined;"
     );
+  });
+
+  it("gives SvelteKit 2's $app/env/public from src/env.ts behind its flag, which takes $env away", async () => {
+    const plugin = configured(
+      { experimental: { explicitEnvironmentVariables: true } },
+      join(FIXTURES, "kit3"),
+      2
+    );
+    expect(await loaded(plugin, "$app/env/public")).toContain("export const PUBLIC_RETRIES = 3;");
+    for (const name of ["$env/static/public", "$env/dynamic/public"]) {
+      const module = await loaded(plugin, name);
+      expect(module).toContain("is off with experimental.explicitEnvironmentVariables");
+      expect(module).not.toContain("PUBLIC_RETRIES = ");
+    }
   });
 
   it("refuses every server-only module with why, declaring the names its importer asked for", async () => {

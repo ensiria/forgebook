@@ -8,7 +8,7 @@
  * that are gone or of another bundle and fail as outdated. A command's server therefore keeps its cache in a folder of
  * its own inside the one the dev server uses: still warm from one command to the next, never the dev server's, and
  * outside its watcher (Vite ignores everything under its cache folder) and its cleanup (only the `deps` folder and
- * `_temp_` folders are removed).
+ * `_temp_` folders are removed). Two commands' servers at once are kept apart the same way (`commandCacheClaim.ts`).
  *
  * @module
  */
@@ -18,24 +18,45 @@ import type { InlineConfig, Plugin, UserConfig } from "vite";
 
 import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { catalogueVite } from "./catalogueVite.ts";
+import { type CacheClaim, claimCommandCache } from "./commandCacheClaim.ts";
 import { viteCacheDir } from "./viteCache.ts";
 
 /** The folder, inside the catalogue's Vite cache folder, where the servers commands start keep their cache. */
 export const COMMAND_CACHE_FOLDER = "forgebook-commands";
 
 /**
- * Moves the server's cache into {@link COMMAND_CACHE_FOLDER} of the folder Vite would use: run after every other
- * plugin, so a framework's plugin that sets its own cache folder is followed too.
+ * Moves the server's cache into {@link COMMAND_CACHE_FOLDER} of the folder Vite would use, or into a folder of its own
+ * beside it while another server holds that one (`commandCacheClaim.ts`): run after every other plugin, so a framework's
+ * plugin that sets its own cache folder is followed too.
+ *
+ * @remarks
+ * The folder is claimed once per plugin and given back when the last server using it closes. A server Vite restarts (an
+ * `.env` file changed) is made anew with the same plugin before the old one closes: counting the servers keeps the
+ * claim through the restart, where giving it back at the old server's close would take the folder from the new one.
+ * `closeBundle` runs once per environment of a server; its client environment counts it.
  */
-const commandCache = (): Plugin => ({
-  name: "forgebook:command-cache",
-  config: {
-    order: "post",
-    handler: (current: UserConfig): UserConfig => ({
-      cacheDir: join(viteCacheDir(current), COMMAND_CACHE_FOLDER)
-    })
-  }
-});
+const commandCache = (): Plugin => {
+  let claim: CacheClaim | undefined;
+  let servers = 0;
+  return {
+    name: "forgebook:command-cache",
+    config: {
+      order: "post",
+      handler: (current: UserConfig): UserConfig => {
+        claim ??= claimCommandCache(join(viteCacheDir(current), COMMAND_CACHE_FOLDER));
+        servers += 1;
+        return { cacheDir: claim.folder };
+      }
+    },
+    closeBundle(): void {
+      if (this.environment.name !== "client" || claim === undefined) return;
+      servers -= 1;
+      if (servers > 0) return;
+      claim.release();
+      claim = undefined;
+    }
+  };
+};
 
 /** Whether this process started a server for a command. */
 let hasStartedServer = false;
