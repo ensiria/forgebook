@@ -116,6 +116,11 @@ structure view), starting Vite through the package manager that runs them (`vite
 another command). A story that breaks a rule fails all its variants; `storyBrowserTests` also takes `check`, a rule of
 the package's own run on every frame.
 
+In CI (`CI` set, as every CI service sets it) a failed test runs again up to twice, as Playwright's own template does:
+a busy runner now and then loses a test's browser before the story opens, which says nothing of the story. A test that
+passes on a retry is reported as flaky, not as passed. Elsewhere nothing is retried; `retries` in `testServer.ts` sets
+the count everywhere (`retries: 0` turns it off).
+
 A test fails on a story its frame gave up on (status `pending`: something still loading after the wait of
 `parameters.suspense`), with the frame's reason, before any check runs: a fallback is not what the check is for.
 

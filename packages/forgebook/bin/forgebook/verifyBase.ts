@@ -23,6 +23,7 @@ import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { findConfigFile } from "../../src/vite/configFile.ts";
 import { gitOutput } from "../../src/vite/gitChange.ts";
 import { configOf } from "./catalogueCommands.ts";
+import { isProcessRunning } from "./commandCacheClaim.ts";
 import { runStoriesCheck } from "./storyCheckRun.ts";
 
 /** Folders whose `node_modules` are not looked for: the base's own copies of them hold no package. */
@@ -81,22 +82,12 @@ const twinModules = (from: string, to: string, root: string, folder: string): vo
 /** The prefix of the folders a base runs in, beside the repository. */
 const folderPrefix = (root: string): string => `.${basename(root)}-forgebook-base-`;
 
-/** Whether a process runs. */
-const isRunning = (pid: number): boolean => {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 /** Removes the base folders a run that is gone left beside the repository, and git's record of them. */
 const sweep = async (root: string): Promise<void> => {
   const prefix = folderPrefix(root);
   for (const name of readdirSync(dirname(root)).filter((each) => each.startsWith(prefix))) {
     const pid = Number(name.split("-").pop());
-    if (Number.isInteger(pid) && !isRunning(pid))
+    if (Number.isInteger(pid) && !isProcessRunning(pid))
       rmSync(join(dirname(root), name), { recursive: true, force: true });
   }
   await gitOutput(root, "worktree", "prune").catch(() => undefined);
