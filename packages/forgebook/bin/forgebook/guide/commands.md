@@ -46,6 +46,9 @@ not report `partly-verified` as verified: say what `skipped` says. A file in `ui
 `verify` again. `coverage: "through"` means it ran in another component's stories. A UI file is a component or a style
 sheet by its extension, a story file, or a script that defines or draws a component; anything else does not fail.
 
+A story's file that is not there (an image under a path the project does not serve) is a problem named by its path,
+`404 (Not Found): /avatars/01.png`: add the file to the public folder or give the story one that exists.
+
 A story file `forgebook new` wrote carries `// forgebook-props: <signature>`, the props it was written for. When the change
 reaches it and its component's props no longer give that signature, `verify` lists it in `outdated` and fails: its args
 may pass a prop that is gone or miss one now required. Check them against `story <id>`'s props, then set the line to
