@@ -1,5 +1,6 @@
 /**
- * Tests for a group's index as its module writes it: each file's stories as rows, read back as the same objects.
+ * Tests for a group's index as its module writes it: a large group's stories as rows, a small one's as objects, read
+ * back the same either way.
  *
  * @module
  */
@@ -38,8 +39,28 @@ const readIndex = (files: readonly IndexedStoryFile[]): unknown => {
   return JSON.parse(JSON.stringify(context.result?.index));
 };
 
+/**
+ * A group of story files of the same shape, as many as asked.
+ *
+ * @param count - how many files.
+ */
+const manyFiles = (count: number): IndexedStoryFile[] =>
+  Array.from({ length: count }, (_, at) => ({
+    key: `./src/W${at}.stories.tsx`,
+    pattern: "./src/*.stories.tsx",
+    file: `/repo/src/W${at}.stories.tsx`,
+    index: {
+      title: `Group/W${at}`,
+      stories: Array.from({ length: 5 }, (_, story) => ({
+        exportName: `Story${story}`,
+        description: `W${at} story ${story}.`,
+        ...(story === 4 ? { hasPlay: true } : {})
+      }))
+    }
+  }));
+
 describe("storyFilesCode", () => {
-  it("writes each story's values once and reads back the objects, leaving out the keys a story lacks", () => {
+  it("reads back the objects either way, leaving out the keys a story lacks", () => {
     const files: IndexedStoryFile[] = [
       {
         key: "./src/Button.stories.tsx",
@@ -58,10 +79,14 @@ describe("storyFilesCode", () => {
       "./src/Button.stories.tsx": BUTTON,
       "./src/Badge.stories.tsx": BADGE
     });
-    const code = storyFilesCode("/repo", ["./src/*.stories.tsx"], files, {
-      hasUsage: false,
-      hasReach: false
-    });
-    expect(code.match(/"exportName"/g)).toHaveLength(1);
+    const many = manyFiles(100);
+    expect(readIndex(many)).toEqual(Object.fromEntries(many.map(({ key, index }) => [key, index])));
+  });
+
+  it("writes a large group's stories as rows, each key once, and a small group's as objects", () => {
+    const code = (files: readonly IndexedStoryFile[]): string =>
+      storyFilesCode("/repo", ["./src/*.stories.tsx"], files, { hasUsage: false, hasReach: false });
+    expect(code(manyFiles(100)).match(/"exportName"/g)).toHaveLength(1);
+    expect(code(manyFiles(2)).match(/"exportName"/g)).toHaveLength(10);
   });
 });
