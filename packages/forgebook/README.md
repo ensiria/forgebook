@@ -1295,8 +1295,10 @@ the plugin too, since each would otherwise give a catalogue that looks right and
   TypeScript file it imports. In a JavaScript file it imports, Node gives no place, and the message names the configuration.
 - **A story pattern that matches nothing**, for `forgebook build`, `stories` and `check`: each pattern is read on its own,
   so a mistaken one beside one that works is named as well, and what a `!` pattern leaves out does not count. `verify`
-  answers `not-verified` with the pattern in `skipped`, and still gives the rest of its answer (what changed, the stories
-  that ran, what they found), so the empty pattern never hides a failure.
+  answers `not-verified` with the pattern in `skipped` when the change touches a UI file, and still gives the rest of its
+  answer (what changed, the stories that ran, what they found), so the empty pattern never hides a failure. A change with
+  no UI file, such as the commit of `init`'s own files before a first story, is `nothing-to-verify`, with the pattern and
+  how to write the first story in `skipped`.
   `forgebook dev` warns instead and opens a home that says where it looks, since you may be about to write the first story;
   saving a file the patterns match shows it. A source's own patterns are its module's to read, and a list of `docs` globs
   may match nothing.
@@ -1523,14 +1525,14 @@ jobs:
   preview:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
       - run: npm ci
       - run: npx forgebook build --out preview --base "/pr-${{ github.event.number }}/"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: catalogue-preview
           path: preview

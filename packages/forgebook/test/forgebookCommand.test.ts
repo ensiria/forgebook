@@ -152,7 +152,7 @@ describe("forgebook --version", () => {
 
 describe("forgebook verify with a story pattern that matches nothing", () => {
   it(
-    "answers not verified, naming the pattern, and still gives the rest of its answer",
+    "names the pattern, and lets a change with no UI file pass",
     () => {
       const empty = catalogue(root, "empty-verify-answer", {});
       const dir = dirname(empty);
@@ -176,13 +176,31 @@ describe("forgebook verify with a story pattern that matches nothing", () => {
         "--url",
         NO_SERVER
       ]);
-      expect(run.exitCode).toBe(1);
+      // no UI file changed, so the pattern is said and does not stop the change
+      expect(run.exitCode).toBe(0);
       const document: unknown = JSON.parse(run.stdout);
       expect(document).toMatchObject({
-        verdict: "not-verified",
+        verdict: "nothing-to-verify",
         skipped: expect.arrayContaining([
           expect.stringContaining('No story file matches "src/*.stories.tsx"')
         ])
+      });
+      // a component changed with no story to show it: not verified, with the command that writes its stories
+      writeFileSync(join(dir, "src", "Badge.tsx"), "export const Badge = () => <span>new</span>;\n");
+      const withComponent = runScriptProcess(ENTRY, [
+        "verify",
+        "--since",
+        "HEAD",
+        "--json",
+        "--config",
+        empty,
+        "--url",
+        NO_SERVER
+      ]);
+      expect(withComponent.exitCode).toBe(1);
+      expect(JSON.parse(withComponent.stdout)).toMatchObject({
+        verdict: "not-verified",
+        uiFiles: [{ file: "src/Badge.tsx", coverage: "none", fix: "npx forgebook new src/Badge.tsx" }]
       });
     },
     SERVER_TIMEOUT

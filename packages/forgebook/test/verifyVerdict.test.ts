@@ -217,7 +217,7 @@ describe("verifyDocument", () => {
     expect(document.uiFiles[0]?.coverage).toBe("own");
   });
 
-  it("fails on a problem found with a configuration problem too, and says not verified with no UI file", () => {
+  it("fails on a problem found with a configuration problem too, and lets a change with no UI file pass", () => {
     const configProblems = ['No story file matches "docs/*.stories.tsx"'];
     const failing = verifyDocument(
       findings({
@@ -232,8 +232,41 @@ describe("verifyDocument", () => {
     const noUi = verifyDocument(
       findings({ configProblems, changed: changedOf([], { files: ["README.md"] }), report: undefined })
     );
-    expect(noUi.verdict).toBe("not-verified");
-    expect(noUi.summary).toContain("not verified");
+    // a change with no UI file is not the gate's business: the problem is said, and the change passes
+    expect(noUi.verdict).toBe("nothing-to-verify");
+    expect(noUi.summary).not.toContain("not verified");
+    expect(noUi.skipped).toContain('No story file matches "docs/*.stories.tsx"');
+  });
+
+  it("passes a change with no UI file while the catalogue has no story, saying how to write the first", () => {
+    const configProblems = [
+      'No story file matches "src/**/*.stories.tsx" (`stories` in the configuration): correct the pattern, or write the first story (npx forgebook new <component file>)'
+    ];
+    const document = verifyDocument(
+      findings({
+        configProblems,
+        changed: changedOf([], { files: ["README.md", "forgebook.config.ts"] }),
+        report: undefined
+      })
+    );
+    expect(document.verdict).toBe("nothing-to-verify");
+    expect(isVerifyFailure(document)).toBe(false);
+    expect(document.summary).toContain("write the first story (npx forgebook new <component file>)");
+  });
+
+  it("keeps a component change not verified while the catalogue has no story, naming the command for it", () => {
+    const configProblems = ['No story file matches "src/**/*.stories.tsx"'];
+    const document = verifyDocument(
+      findings({
+        configProblems,
+        changed: changedOf([{ file: "src/Badge.tsx", path: "src/Badge.tsx", coverage: "none", stories: [] }]),
+        report: undefined
+      })
+    );
+    expect(document.verdict).toBe("not-verified");
+    expect(isVerifyFailure(document)).toBe(true);
+    expect(document.uiFiles[0]).toMatchObject({ coverage: "none", fix: "npx forgebook new src/Badge.tsx" });
+    expect(document.skipped).toContain('No story file matches "src/**/*.stories.tsx"');
   });
 
   it("has a false-green rate of zero on the seeded set", () => {
