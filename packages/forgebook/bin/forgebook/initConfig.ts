@@ -6,7 +6,8 @@
  * Pure: the configuration in, the file's text out. The file is written as a person would write it (the `defineConfig`
  * of the README, one field a line), so it is the project's from then on; the switches read from Storybook's
  * `globalTypes` are written out as Forgebook's own, applied by code as Storybook's decorators expect, so a person can
- * tell each to apply as an attribute or a class later.
+ * tell each to apply as an attribute or a class later. A project whose dark scheme is a `.dark` class gets the theme
+ * switch written to set it.
  *
  * @module
  */
@@ -59,7 +60,9 @@ export const initConfigText = (imported: ImportedConfig, tool: string | undefine
     ...(imported.switches === undefined
       ? []
       : [
-          `  // from the preview's globalTypes: applied by code, as ${tool ?? "the app"}'s decorators read them`,
+          tool === undefined
+            ? "  // the app draws dark from a `.dark` class on the page, so the theme sets that class"
+            : `  // from the preview's globalTypes: applied by code, as ${tool}'s decorators read them`,
           `  switches: ${sourceOf(imported.switches, "  ")},`
         ])
   ];
