@@ -642,6 +642,12 @@
     flex: 1;
     min-height: 0;
     overflow: auto;
+
+    // a field the focus reaches scrolls into view above the Props tab's sticky bar, not under it: the bar's height
+    // (two paddings and a control's line) and room for the focus ring
+    &:has(.forgebook-tab-foot) {
+      scroll-padding-block-end: 2.5rem;
+    }
   }
 
   .forgebook-icon-button {
@@ -690,11 +696,18 @@
     color: $text-secondary;
   }
 
+  // the Props tab's actions, the tab's last child: it stays at the bottom of the panel's scroller while the props
+  // scroll under it, and as it keeps its place in the flow the last prop always ends above it
   .forgebook-tab-foot {
+    position: sticky;
+    bottom: 0;
+    // over the controls that make their own layer (a swatch, a range)
+    z-index: 1;
     display: flex;
     align-items: center;
     gap: $space-3;
     padding: $space-2-5 $space-3-5;
+    background: $surface;
     box-shadow: $line-top;
   }
 
@@ -3083,8 +3096,9 @@
     flex-direction: column;
     gap: $space-1-5;
 
+    // a switch keeps its own drawing (`.forgebook-switch`)
     select,
-    input,
+    input:not(.forgebook-switch),
     textarea {
       box-sizing: border-box;
       height: 1.625rem;
@@ -3106,7 +3120,7 @@
       resize: vertical;
     }
 
-    input[type="checkbox"],
+    input[type="checkbox"]:not(.forgebook-switch),
     input[type="radio"] {
       height: auto;
       box-shadow: none;
@@ -3160,12 +3174,6 @@
     color: $text-tertiary;
   }
 
-  .forgebook-toggle-row {
-    display: inline-flex;
-    align-items: center;
-    gap: $space-1;
-  }
-
   .forgebook-prop__head {
     display: flex;
     align-items: center;
@@ -3185,7 +3193,7 @@
     display: flex;
     gap: $space-1-5;
 
-    > input:first-child {
+    > input:first-child:not(.forgebook-switch) {
       flex: 1;
       min-width: 0;
     }

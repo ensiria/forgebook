@@ -4,8 +4,8 @@
  * example.
  *
  * @remarks
- * The frames load a few at a time (`useFrameQueue`), in the page's order, the demo first, each as it comes near the
- * visible part of the page: a component may have twenty stories. The view's live part reaches every frame as a message, as
+ * The frames load a few at a time (`useFrameQueue`), each as it comes near the visible part of the page, the nearest
+ * first and the demo first among those in view: a component may have a hundred stories. The view's live part reaches every frame as a message, as
  * on the story page; the props panel and Replay belong to a story's own page, which each story's name links to. The
  * documentation file's HTML is the package's own, made at build time (`vite/componentPage.ts`). Who reads the page
  * reorders and filters what goes around the frames (`audienceLayout.ts`); what only one audience wants loads on first use,

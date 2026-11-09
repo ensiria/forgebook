@@ -11,6 +11,7 @@ import { type ArgValue, isArgList, isArgObject, isDateArg, isNamedArg } from "..
 import { isValueOfShape } from "../../shapeValues.ts";
 import type { ValueShape } from "../../valueShape.ts";
 import { MOST_PLAIN_OPTIONS } from "../PropFields.tsx";
+import { Switch } from "../Switch.tsx";
 import { STRINGS } from "../strings.ts";
 import { EDITOR_STRINGS } from "./editorStrings.ts";
 import type { FieldProps } from "./fieldTypes.ts";
@@ -251,13 +252,12 @@ export const ValueField = (props: FieldProps): ReactNode => {
       return <DateLeaf {...props} />;
     case "boolean":
       return (
-        <input
-          type="checkbox"
-          aria-label={props.label}
-          aria-describedby={props.describedBy}
-          checked={shape.only ?? props.value === true}
+        <Switch
+          label={props.label}
+          isOn={shape.only ?? props.value === true}
+          describedBy={props.describedBy}
           disabled={shape.only !== undefined}
-          onChange={(event: ChangeEvent<HTMLInputElement>): void => props.onChange(event.target.checked)}
+          onChange={props.onChange}
         />
       );
     case "choice":
