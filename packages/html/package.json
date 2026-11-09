@@ -1,6 +1,6 @@
 {
   "name": "@forgebook/html",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Forgebook for plain HTML: stories that return an HTML string or a DOM node, written in JavaScript or TypeScript with no framework; the story types, the renderer the frame draws them with, and the adapter that reads a story function's args from its types and TSDoc.",
   "license": "MIT",
   "repository": {

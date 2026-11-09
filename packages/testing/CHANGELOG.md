@@ -1,3 +1,22 @@
+## 0.2.6 (2026-11-09)
+
+### 🚀 Features
+
+- **testing:** make a story's missing static file a warning ([8fa0cc14](https://github.com/ensiria/forgebook/commit/8fa0cc14))
+
+### 🩹 Fixes
+
+- **testing:** name the file a story could not load in its problem ([b1b5046f](https://github.com/ensiria/forgebook/commit/b1b5046f))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.3.1
+- Updated forgebook to 0.4.1
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.2.5 (2026-11-08)
 
 ### 🚀 Features

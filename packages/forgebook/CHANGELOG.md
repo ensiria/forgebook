@@ -1,3 +1,33 @@
+## 0.4.1 (2026-11-09)
+
+### 🚀 Features
+
+- **forgebook:** write a control's value in story code as the story gets it ([833fafb6](https://github.com/ensiria/forgebook/commit/833fafb6))
+- **forgebook:** let presets register controls matched by prop type ([3d3fb973](https://github.com/ensiria/forgebook/commit/3d3fb973))
+- **forgebook:** switch the home and a component's page to full width ([6bce6f0d](https://github.com/ensiria/forgebook/commit/6bce6f0d))
+- **testing:** make a story's missing static file a warning ([8fa0cc14](https://github.com/ensiria/forgebook/commit/8fa0cc14))
+- **shell:** draw boolean props as switches in the field layout ([d974f320](https://github.com/ensiria/forgebook/commit/d974f320))
+
+### 🩹 Fixes
+
+- **shell:** scroll a focused prop into view above the sticky bar ([d3ac1c4d](https://github.com/ensiria/forgebook/commit/d3ac1c4d))
+- **shell:** keep the Props tab's Reset and Worst case bar in view ([84133a66](https://github.com/ensiria/forgebook/commit/84133a66))
+- **forgebook:** load the frames in view first after a fast scroll ([f57e787e](https://github.com/ensiria/forgebook/commit/f57e787e))
+- **forgebook:** retry removing the base folder while Vite still writes ([e4ccd5cd](https://github.com/ensiria/forgebook/commit/e4ccd5cd))
+- **forgebook:** answer a missing file with 404, not the app's page ([9b863092](https://github.com/ensiria/forgebook/commit/9b863092))
+
+### 🔥 Performance
+
+- **forgebook:** load a frame's control docs only when a module may act ([e3b2f394](https://github.com/ensiria/forgebook/commit/e3b2f394))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.3.1
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.4.0 (2026-11-08)
 
 ### 🚀 Features

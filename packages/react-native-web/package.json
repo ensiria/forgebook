@@ -1,6 +1,6 @@
 {
   "name": "@forgebook/react-native-web",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "Forgebook for React Native: a React Native project's components drawn in the browser through react-native-web, on Vite, their props read as React's.",
   "keywords": [
     "react-native",

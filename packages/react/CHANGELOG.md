@@ -1,3 +1,19 @@
+## 0.2.6 (2026-11-09)
+
+### 🚀 Features
+
+- **forgebook:** let presets register controls matched by prop type ([3d3fb973](https://github.com/ensiria/forgebook/commit/3d3fb973))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.3.1
+- Updated forgebook to 0.4.1
+- Updated @forgebook/testing to 0.2.6
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.2.5 (2026-11-08)
 
 ### 🚀 Features

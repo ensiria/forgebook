@@ -1,3 +1,12 @@
+## 0.2.6 (2026-11-09)
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.3.1
+- Updated forgebook to 0.4.1
+- Updated @forgebook/testing to 0.2.6
+- Updated @forgebook/vue to 0.2.6
+
 ## 0.2.5 (2026-11-08)
 
 ### 🚀 Features
