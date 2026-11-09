@@ -216,6 +216,19 @@ const shapeOf = (state: ProjectState): string =>
   JSON.stringify([state.routes, [...state.components.values()], state.importNames]);
 
 /**
+ * The code that loads a project's component when it is first drawn: its file's default, or the export a module
+ * registered it by.
+ *
+ * @param component - the component.
+ */
+export const componentLoad = (component: ProjectComponent): string => {
+  const load = `import(${codeLiteral(component.file)})`;
+  return component.exportName === undefined
+    ? load
+    : `${load}.then((module) => module.${component.exportName})`;
+};
+
+/**
  * The code of `#components`: each of the project's components, its `Lazy` form, and Nuxt's own.
  *
  * @param state - the project.
@@ -224,9 +237,9 @@ const componentsModule = (state: ProjectState): string =>
   [
     'import { defineAsyncComponent } from "vue";',
     `export { ${BUILT_IN_COMPONENT_NAMES.join(", ")} } from ${codeLiteral(COMPONENTS_MODULE)};`,
-    ...[...state.components.values()].flatMap(({ name, file }) => [
-      `export { default as ${name} } from ${codeLiteral(file)};`,
-      `export const Lazy${name} = defineAsyncComponent(() => import(${codeLiteral(file)}));`
+    ...[...state.components.values()].flatMap((component) => [
+      `export { ${component.exportName ?? "default"} as ${component.name} } from ${codeLiteral(component.file)};`,
+      `export const Lazy${component.name} = defineAsyncComponent(() => ${componentLoad(component)});`
     ])
   ].join("\n");
 
@@ -263,7 +276,7 @@ const projectCode = (state: ProjectState, imports: string, appConfigs: string): 
     app: { baseURL: config.baseURL, buildAssetsDir: config.buildAssetsDir, cdnURL: "" }
   };
   const loaders = [...state.components.values()].map(
-    ({ name, file }) => `    ${codeLiteral(name)}: () => import(${codeLiteral(file)})`
+    (component) => `    ${codeLiteral(component.name)}: () => ${componentLoad(component)}`
   );
   return [
     imports,
@@ -346,8 +359,8 @@ const namedComponent = (
 const componentImport = ({ name, component, isLazy }: NamedComponent, local: string): string => {
   if (component === undefined)
     return `import { ${name} as ${local} } from ${codeLiteral(COMPONENTS_MODULE)};`;
-  if (isLazy) return `const ${local} = __forgebookDefineAsync(() => import(${codeLiteral(component.file)}));`;
-  return `import ${local} from ${codeLiteral(component.file)};`;
+  if (isLazy) return `const ${local} = __forgebookDefineAsync(() => ${componentLoad(component)});`;
+  return `import { ${component.exportName ?? "default"} as ${local} } from ${codeLiteral(component.file)};`;
 };
 
 /**
@@ -518,8 +531,9 @@ export const nuxtPlugins = (options: NuxtOptions = {}, modules?: NuxtModules): P
           "import.meta.dev": codeLiteral(isDev),
           "import.meta.test": "false"
         },
-        // the stand-ins and the renderer are one module graph, served from their sources: see the module's remarks
-        optimizeDeps: { exclude: ["@forgebook/nuxt"] },
+        // the stand-ins and the renderer are one module graph, served from their sources: see the module's remarks;
+        // Vue's adapter with them, so the preview's `setup` and the renderer share one list of set-ups
+        optimizeDeps: { exclude: ["@forgebook/nuxt", "@forgebook/vue"] },
         ssr: { noExternal: ["@forgebook/nuxt"] }
       };
     },
