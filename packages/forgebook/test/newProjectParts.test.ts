@@ -10,6 +10,7 @@ import { join } from "node:path";
 
 import { afterAll, describe, expect, it } from "vitest";
 
+import { isClassDarkScheme } from "../bin/forgebook/newProject/darkScheme.ts";
 import {
   detectPackageManager,
   forgebookRunner,
@@ -290,5 +291,28 @@ describe("what an entry says", () => {
       })
     ).toEqual(["a.css"]);
     expect(angularStyles(undefined)).toEqual([]);
+  });
+});
+
+describe("a project's dark scheme", () => {
+  it("is a class when its style sheets or Tailwind's configuration say so", () => {
+    expect(isClassDarkScheme([".dark {\n  --background: black;\n}"], "")).toBe(true);
+    expect(isClassDarkScheme(["html.dark { color-scheme: dark; }"], "")).toBe(true);
+    expect(isClassDarkScheme([":root, .dark .card { color: red; }"], "")).toBe(true);
+    expect(isClassDarkScheme(["@custom-variant dark (&:is(.dark *));"], "")).toBe(true);
+    expect(isClassDarkScheme([], 'export default { darkMode: "class" };')).toBe(true);
+    expect(isClassDarkScheme([], "module.exports = { darkMode: ['selector', '.night'] };")).toBe(true);
+  });
+
+  it("is not one for data-theme, a media query, a name that only starts with dark, or a comment", () => {
+    expect(isClassDarkScheme(['[data-theme="dark"] { --bg: black; }', ".dark { --bg: black; }"], "")).toBe(
+      false
+    );
+    expect(isClassDarkScheme(["@media (prefers-color-scheme: dark) { :root { --bg: black; } }"], "")).toBe(
+      false
+    );
+    expect(isClassDarkScheme([".darkest { color: black; } .dark-mode { color: black; }"], "")).toBe(false);
+    expect(isClassDarkScheme(["/* .dark { } */ a { color: red; }"], "")).toBe(false);
+    expect(isClassDarkScheme([], 'export default { darkMode: "media" };')).toBe(false);
   });
 });

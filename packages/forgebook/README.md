@@ -62,7 +62,9 @@ It asks nothing, so an agent can run it. In the folder of the package that holds
 (React, Vue, Svelte, Solid, Preact, Lit, Angular, Next.js, Nuxt, SvelteKit, React Native Web) and the package manager
 from the project's files, and writes:
 
-- `forgebook.config.ts`: the adapter, the title, and story globs over the folders that exist;
+- `forgebook.config.ts`: the adapter, the title, and story globs over the folders that exist; where the app draws
+  dark from a `.dark` class (Tailwind's class strategy, shadcn's themes, Nuxt's color-mode), the theme switch set to
+  that class, since Forgebook's own sets `data-theme`;
 - `forgebook.preview.ts` (`.tsx` where stories are), when the app loads global style sheets: the imports of its entry
   (Vite's `index.css`, a Next.js root layout's `globals.css`, a SvelteKit layout's, `angular.json`'s `styles`), since
   stories look wrong without them. Nuxt's adapter reads `css` from `nuxt.config` itself, so it needs none.

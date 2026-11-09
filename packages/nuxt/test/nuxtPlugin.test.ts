@@ -21,7 +21,8 @@ import { NUXT_STAND_INS } from "../src/vite/standIns.ts";
 
 /** The project's components the tests name. */
 const COMPONENTS = new Map<string, ProjectComponent>([
-  ["BaseBadge", { name: "BaseBadge", file: "/p/app/components/base/Badge.vue" }]
+  ["BaseBadge", { name: "BaseBadge", file: "/p/app/components/base/Badge.vue" }],
+  ["Button", { name: "Button", file: "/p/app/components/ui/button/index.ts", exportName: "Button" }]
 ]);
 
 describe("a template's components", () => {
@@ -38,13 +39,26 @@ describe("a template's components", () => {
       `import { NuxtLink as __nuxt_component_0 } from ${codeLiteral("@forgebook/nuxt/app/components")};`
     );
     expect(written).toContain(
-      `import __nuxt_component_1 from ${codeLiteral("/p/app/components/base/Badge.vue")};`
+      `import { default as __nuxt_component_1 } from ${codeLiteral("/p/app/components/base/Badge.vue")};`
     );
     expect(written).toContain(
       `const __nuxt_component_2 = __forgebookDefineAsync(() => import(${codeLiteral("/p/app/components/base/Badge.vue")}));`
     );
     expect(written).toContain("const b = __nuxt_component_1;\nconst c = __nuxt_component_1;");
     expect(written).toContain('const e = _resolveComponent("RouterView");');
+  });
+
+  it("imports a component registered by a named export by that name, eager or lazy", () => {
+    const code = [
+      'const a = _resolveComponent("Button");',
+      'const b = _resolveComponent("LazyButton");'
+    ].join("\n");
+    const written = withComponentImports(new MagicString(code), COMPONENTS)?.toString() ?? "";
+    const file = codeLiteral("/p/app/components/ui/button/index.ts");
+    expect(written).toContain(`import { Button as __nuxt_component_0 } from ${file};`);
+    expect(written).toContain(
+      `const __nuxt_component_1 = __forgebookDefineAsync(() => import(${file}).then((module) => module.Button));`
+    );
   });
 
   it("changes nothing in code that names no component it knows", () => {

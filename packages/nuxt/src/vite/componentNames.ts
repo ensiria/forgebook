@@ -23,6 +23,11 @@ export type ProjectComponent = {
   readonly name: string;
   /** Its file, absolute. */
   readonly file: string;
+  /**
+   * The export it is, when not the file's default: a module may register a component its file exports by name (an
+   * `index.ts` that exports `Button`, as shadcn-vue's do).
+   */
+  readonly exportName?: string;
 };
 
 /**
