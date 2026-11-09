@@ -5,7 +5,9 @@ tests:
 
 - **in the browser** (Playwright), one test per story and variant (theme, contrast, style sheets, a narrow width): it
   fails on an error in the page, an [axe](https://github.com/dequelabs/axe-core) violation of WCAG 2.2 A and AA, an
-  element that spills out of its parent, or an overlay left open past the story's frame; a static file that answers 404
+  element that spills out of its parent (an inline element by what it draws: the space a line ends with at a soft wrap,
+  which `white-space: pre-wrap` lets hang past the line, is no spill), or an overlay left open past the story's frame;
+  a static file that answers 404
   (an image, a font) is a `warning` annotation on the test, not a failure;
 - **visual**, the same frames compared with reference screenshots, in the Playwright container so fonts and rendering
   match everywhere;
