@@ -66,18 +66,41 @@ const parametersAfter = (text: string, name: string): string => {
   return "";
 };
 
+/** A `/* … *\/` comment at the very start of a style sheet, what is inside it captured. */
+const LEADING_BLOCK = /^\s*\/\*([\s\S]*?)\*\//;
+
 /**
- * The first sentence of a style sheet's leading `//` comment.
+ * The text of a style sheet's leading comment: its `//` lines, or a `/* … *\/` block, which is the only comment plain
+ * CSS has. A block's lines lose their ` * ` margin and end at its first blank line or tag, so a licence's `@license` is
+ * no summary.
  *
  * @param text - the style sheet's source.
  */
-export const styleSheetSummary = (text: string): string => {
+const leadingComment = (text: string): string => {
   const lines: string[] = [];
   for (const line of text.split("\n")) {
     if (!line.startsWith("//")) break;
     lines.push(line.slice(2).trim());
   }
-  const comment = lines.join(" ");
+  if (lines.length > 0) return lines.join(" ");
+  const block = LEADING_BLOCK.exec(text)?.[1];
+  if (block === undefined) return "";
+  const inner = block
+    .replace(/^[*!]+/, "")
+    .split("\n")
+    .map((line) => line.replace(/^\s*\*?\s?/, "").trim());
+  const first = inner.findIndex((line) => line !== "");
+  const body = first === -1 ? [] : inner.slice(first);
+  return summaryOfComment(body);
+};
+
+/**
+ * The first sentence of a style sheet's leading comment, `//` lines or a `/* … *\/` block; empty when it has none.
+ *
+ * @param text - the style sheet's source.
+ */
+export const styleSheetSummary = (text: string): string => {
+  const comment = leadingComment(text);
   const end = comment.search(/\.(\s|$)/);
   return end === -1 ? comment : comment.slice(0, end + 1);
 };

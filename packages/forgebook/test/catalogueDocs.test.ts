@@ -20,6 +20,21 @@ describe("sassDocs", () => {
     ]);
   });
 
+  it("reads a plain style sheet's leading block comment", () => {
+    expect(styleSheetSummary("/* The kit's tokens. More words. */\n:root { --a: 1; }")).toBe(
+      "The kit's tokens."
+    );
+    expect(
+      styleSheetSummary("\n/**\n * The kit's reset\n * for every page.\n *\n * Not this.\n */\na {}")
+    ).toBe("The kit's reset for every page.");
+    expect(styleSheetSummary("/*! The kit. */\na {}")).toBe("The kit.");
+  });
+
+  it("leaves a style sheet with no leading comment empty, and a licence's tag out of a summary", () => {
+    expect(styleSheetSummary(":root { --a: 1; }\n/* Later. */")).toBe("");
+    expect(styleSheetSummary("/* @license MIT */\na {}")).toBe("");
+  });
+
   it("gives a style sheet the first sentence of its leading comment", () => {
     expect(styleSheetSummary('// The sheet. More words.\n// Still the comment.\n@use "x";')).toBe(
       "The sheet."
