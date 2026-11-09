@@ -36,6 +36,7 @@
     "./docs": "./src/vite/extractDocs.ts",
     "./project": "./src/pageProject.ts",
     "./renderer": "./src/renderer.ts",
+    "./setup": "./src/setup.ts",
     "./story": "./src/storyNuxt.ts",
     "./vite": "./src/vite/nuxt.ts"
   },
@@ -125,6 +126,10 @@
       "./renderer": {
         "types": "./dist/src/renderer.d.ts",
         "default": "./dist/src/renderer.js"
+      },
+      "./setup": {
+        "types": "./dist/src/setup.d.ts",
+        "default": "./dist/src/setup.js"
       },
       "./story": {
         "types": "./dist/src/storyNuxt.d.ts",

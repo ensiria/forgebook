@@ -27,7 +27,7 @@ import type { Import } from "unimport";
 import { type Logger, normalizePath, type Plugin } from "vite";
 
 import type { ProjectComponent } from "./componentNames.ts";
-import { resolvedPath } from "./nuxtConfig.ts";
+import { APP_CONFIG_FILES, resolvedPath } from "./nuxtConfig.ts";
 
 /** What is Nuxt's own runtime, its tools, or the framework's plugin, by a plugin's name. */
 const LEFT_OUT =
@@ -46,7 +46,9 @@ export type NuxtModules = {
   readonly css: readonly string[] | undefined;
   /** Nuxt's build folder, in Vite's form. */
   readonly buildDir: string | undefined;
-  /** Whether what Nuxt wrote there is newer than the project's configs, so that its app config can be read. */
+  /**
+   * Whether what Nuxt wrote there is this project's and newer than its configs, so that its app config can be read.
+   */
   readonly isFresh: boolean;
   /** Nuxt's own package folder, which the files it writes import their packages from (`defu`); none without Nuxt. */
   readonly nuxtDir: string | undefined;
@@ -345,8 +347,8 @@ export const moduleImports = (
     });
   });
 
-/** A component line of Nuxt's `components.d.ts`. */
-const COMPONENT_LINE = /^export const ([A-Z]\w*): typeof import\("([^"]+)"\)(?:\['default'\]|\.default)/gm;
+/** A component line of Nuxt's `components.d.ts`: its name, its file, and the export it is (`default` or a name). */
+const COMPONENT_LINE = /^export const ([A-Z]\w*): typeof import\("([^"]+)"\)(?:\['(\w+)'\]|\.(\w+))/gm;
 
 /**
  * The components Nuxt wrote that come from its modules.
@@ -357,8 +359,12 @@ const COMPONENT_LINE = /^export const ([A-Z]\w*): typeof import\("([^"]+)"\)(?:\
 export const moduleComponents = (text: string, buildDir: string): readonly ProjectComponent[] =>
   [...text.matchAll(COMPONENT_LINE)].flatMap((match) => {
     const file = fromBuildDir(buildDir, match[2] ?? "");
+    const exported = match[3] ?? match[4];
     // absolute on the running system: on Windows a file Nuxt wrote starts with its drive (`D:/`)
-    return match[1] === undefined || isNuxtOwn(file) || !isAbsolute(file) ? [] : [{ name: match[1], file }];
+    if (match[1] === undefined || exported === undefined || isNuxtOwn(file) || !isAbsolute(file)) return [];
+    return [
+      exported === "default" ? { name: match[1], file } : { name: match[1], file, exportName: exported }
+    ];
   });
 
 /** The extensions a source Nuxt wrote without one may have. */
@@ -436,18 +442,36 @@ const withoutServer = ({
 }: Plugin): Plugin => rest;
 
 /**
+ * Whether the app config Nuxt wrote is this project's: it imports the project's own `app.config` by its absolute path,
+ * so a build folder copied or moved with the project names the folder it was written in, and the file there gets none
+ * of Nuxt's auto-imports (`defineAppConfig`).
+ *
+ * @param builtAppConfig - the text of the app config Nuxt wrote; empty when it wrote none.
+ * @param ownAppConfig - the project's own `app.config` file, absolute; none when it has none.
+ */
+export const isBuiltHere = (builtAppConfig: string, ownAppConfig: string | undefined): boolean =>
+  builtAppConfig === "" ||
+  ownAppConfig === undefined ||
+  builtAppConfig.includes(`"${normalizePath(ownAppConfig)}"`);
+
+/**
  * What the project's files say Nuxt still has to write: `nuxt prepare` is the step for each.
  *
  * @param missing - the style sheets listed and not written.
  * @param isPrepared - whether Nuxt wrote its components and auto-imports.
  * @param isFresh - whether those are newer than the configs.
+ * @param isHere - whether Nuxt wrote them in this project's folder.
  */
 const preparedProblems = (
   missing: readonly string[],
   isPrepared: boolean,
-  isFresh: boolean
+  isFresh: boolean,
+  isHere: boolean
 ): readonly string[] =>
   [
+    ...(isPrepared && !isHere
+      ? ["What Nuxt wrote in its build folder names the project in another folder"]
+      : []),
     ...(missing.length === 0
       ? []
       : [`${missing.join(", ")} ${missing.length === 1 ? "is" : "are"} written by Nuxt and not there yet`]),
@@ -488,6 +512,10 @@ const takenFrom = async (
     builtText(paths.buildDir, "imports.d.ts") || builtText(paths.buildDir, "types/imports.d.ts");
   const componentsText = builtText(paths.buildDir, "components.d.ts");
   const isPrepared = importsText !== "" && componentsText !== "";
+  const ownAppConfig = APP_CONFIG_FILES.map((name) => join(paths.srcDir, name)).find((file) =>
+    existsSync(file)
+  );
+  const isHere = isBuiltHere(builtText(paths.buildDir, "app.config.mjs"), ownAppConfig);
   const isFresh = isNewerThanConfig(join(paths.buildDir, "components.d.ts"), rootDir, paths.srcDir);
   const isLeftOut = (plugin: Plugin): boolean => LEFT_OUT.test(plugin.name);
   return {
@@ -495,7 +523,7 @@ const takenFrom = async (
     leftOut: [...new Set(written.filter(isLeftOut).map((plugin) => plugin.name))],
     css: [...new Set(listed.flatMap((sheet) => sheetImport(sheet, paths) ?? []))],
     buildDir: paths.buildDir,
-    isFresh: isPrepared && isFresh,
+    isFresh: isPrepared && isFresh && isHere,
     builtScripts: await builtScriptsOf(nuxt, paths.buildDir),
     nuxtDir: nuxtFolder(rootDir),
     imports: moduleImports(importsText, paths.buildDir, loadableFrom(rootDir)),
@@ -503,7 +531,8 @@ const takenFrom = async (
     problems: preparedProblems(
       listed.filter((sheet) => sheetImport(sheet, paths) === undefined),
       isPrepared,
-      isFresh
+      isFresh,
+      isHere
     )
   };
 };

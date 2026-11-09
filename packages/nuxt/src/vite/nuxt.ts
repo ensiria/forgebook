@@ -46,7 +46,13 @@ export const nuxt = (options: NuxtOptions = {}): FrameworkAdapter => {
     docsModule: new URL(`./extractDocs${extname(import.meta.url)}`, import.meta.url).href,
     // both are this package's: a catalogue resolves only the packages it installs, and it need not install Vue's adapter
     pages: { frame: FRAME_MODULE, code: "@forgebook/nuxt/code" },
-    browserDependencies: [...(base.browserDependencies ?? []), "vue-router", "forgebook/frame"],
+    // Vue's adapter is served from its files, as this package is (`nuxtPlugin.ts`): pre-bundled, the preview's
+    // set-up module would be a copy apart from the one the renderer reads, and its set-ups would never run
+    browserDependencies: [
+      ...(base.browserDependencies ?? []).filter((name) => !name.startsWith("@forgebook/vue")),
+      "vue-router",
+      "forgebook/frame"
+    ],
     ...(base.componentFiles === undefined ? {} : { componentFiles: base.componentFiles }),
     vitePlugins: async (context?: AdapterContext): Promise<readonly PluginOption[]> => {
       const isLoaded = options.loadModules !== false && context?.readsAppBuild !== false;
