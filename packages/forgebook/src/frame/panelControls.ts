@@ -12,12 +12,24 @@ import type { StorySource } from "@forgebook/story-format/source";
 
 import type { PanelArgs, ShellMessage } from "../messages.ts";
 import { sourceFiles } from "../sourceFiles.ts";
+import { panelArgTypesOf } from "../storyArgTypes.ts";
 import type { ControlStory, ControlValues } from "./controlValues.ts";
 import { STATUS_ATTRIBUTE } from "./frameStatus.ts";
+import { panelArgsOf } from "./panelValues.ts";
 import type { StoryControls } from "./storyRun.ts";
 
 /** The custom controls' frame modules, by control: how to load each. */
 export type ControlFrameLoaders = Readonly<Record<string, () => Promise<unknown>>>;
+
+/** The story a message is for, as `take` reads it. */
+export type TakenStory<TControls> = {
+  /** The story as it is now. */
+  readonly story: Omit<ControlStory, "loadDocs">;
+  /** Its controls once drawn; none before, when nothing is answered. */
+  readonly controls: TControls | undefined;
+  /** Tells the shell the story's own values again. */
+  readonly tellReady: () => void;
+};
 
 /** A frame's custom controls with a frame module; with none, it hands the shell's messages on as they come. */
 export type PanelControls = {
@@ -29,14 +41,10 @@ export type PanelControls = {
    * @param story - the story as it is now, and its controls once drawn; none before, when nothing is answered.
    * @param answer - answers any other message.
    */
-  readonly take: (
+  readonly take: <TControls extends Pick<StoryControls, "setPanelArgs">>(
     message: ShellMessage,
-    story: {
-      readonly story: Omit<ControlStory, "loadDocs">;
-      readonly controls: StoryControls | undefined;
-      readonly tellReady: () => void;
-    },
-    answer: (controls: StoryControls) => void
+    story: TakenStory<TControls>,
+    answer: (controls: TControls) => void
   ) => void;
   /**
    * The story's values with the turned ones over them; an arg whose control failed is left out, so the story keeps its
@@ -59,6 +67,37 @@ export type PanelControls = {
    * @param shown - the same as plain data gives them.
    */
   readonly panelArgs: (values: Readonly<Record<string, unknown>>, shown: PanelArgs) => PanelArgs;
+};
+
+/**
+ * Whether a frame module may have something to do for the story, so its docs are worth loading: the panel gives a
+ * value (any prop may be one a control takes by type), the story's `argTypes` name a control with a frame module, or
+ * the story gives itself a value plain data cannot show (an icon a module could name). A story with none of these, most
+ * of a page's frames, loads neither the turning code nor its docs.
+ *
+ * @param args - the panel's values.
+ * @param story - the story.
+ * @param loaders - the frame modules, by control.
+ * @param source - the story's source, whose named values show some values plainly.
+ */
+const mayTurn = (
+  args: PanelArgs,
+  story: Omit<ControlStory, "loadDocs">,
+  loaders: ControlFrameLoaders,
+  source: StorySource
+): boolean => {
+  if (Object.keys(args).length > 0) return true;
+  const named = Object.values(panelArgTypesOf(story.argTypes, [])).some(
+    (argType) => argType.customControl !== undefined && Object.hasOwn(loaders, argType.customControl)
+  );
+  const shown = panelArgsOf(story.args, source.namedValues);
+  // an event's handler is no value a control sets: a type's control never takes an event
+  return (
+    named ||
+    Object.entries(story.args).some(
+      ([name, value]) => value !== undefined && !Object.hasOwn(shown, name) && !/^on[A-Z]/.test(name)
+    )
+  );
 };
 
 /**
@@ -85,17 +124,26 @@ export const panelControls = (
   const reportError = (error: unknown): void =>
     report(error instanceof Error ? error.message : String(error));
   return {
-    take: (
+    take: <TControls extends Pick<StoryControls, "setPanelArgs">>(
       message: ShellMessage,
-      { story, controls, tellReady }: Parameters<PanelControls["take"]>[1],
-      answer: (drawn: StoryControls) => void
+      { story, controls, tellReady }: TakenStory<TControls>,
+      answer: (drawn: TControls) => void
     ): void => {
       if (controls === undefined) return;
       if (message.type !== "forgebook:args") {
         if (loaders === undefined) answer(controls);
         else turning = turning.then(() => answer(controls));
       } else if (loaders === undefined) controls.setPanelArgs(message.args);
-      else {
+      else if (!mayTurn(message.args, story, loaders, source)) {
+        // nothing a module could turn or name: no module, and no docs, load for this story
+        const hadOwn = Object.keys(made?.own ?? {}).length > 0;
+        count += 1;
+        made = undefined;
+        turning = turning.then(() => {
+          controls.setPanelArgs(message.args);
+          if (hadOwn) tellReady();
+        });
+      } else {
         count += 1;
         const asked = count;
         turning = import("./controlValues.ts")
