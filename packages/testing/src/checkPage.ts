@@ -13,7 +13,14 @@ import { chromium, type Page } from "@playwright/test";
 import { type A11ySettings, type CatalogueLists, catalogueSettings } from "forgebook/catalogue";
 import type { StoryCheckReport, StoryCheckResult } from "forgebook/story-check";
 
-import { axeProblems, errorProblems, focusProblems, spillProblems, watchedErrors } from "./storyCheck.ts";
+import {
+  axeProblems,
+  errorProblems,
+  focusProblems,
+  missingFileWarnings,
+  spillProblems,
+  watchedErrors
+} from "./storyCheck.ts";
 
 /** How long a page gets for its network to go quiet, in milliseconds. */
 const QUIET_MS = 10_000;
@@ -33,12 +40,13 @@ const checkedPage = async (
   a11y: A11ySettings | undefined
 ): Promise<StoryCheckResult> => {
   const page = await open();
-  const errors = watchedErrors(page);
+  const watched = watchedErrors(page);
   const result = (problems: StoryCheckResult["problems"]): StoryCheckResult => ({
     storyId: address,
     view: "",
     frame: address,
-    problems
+    problems,
+    ...missingFileWarnings(watched())
   });
   try {
     const response = await page.goto(address);
@@ -50,7 +58,7 @@ const checkedPage = async (
       ...(a11y === undefined ? [] : await axeProblems(page, a11y)),
       ...(await spillProblems(page, "body")),
       ...(await focusProblems(page)),
-      ...errorProblems(errors)
+      ...errorProblems(watched())
     ]);
   } catch (error) {
     return result([{ kind: "frame", message: error instanceof Error ? error.message : String(error) }]);

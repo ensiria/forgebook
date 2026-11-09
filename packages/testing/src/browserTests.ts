@@ -28,9 +28,27 @@ import { DEFAULT_SWITCHES, switchWithRole, type ViewSwitch } from "forgebook/swi
 import { defaultView, frameAddress, type ViewState } from "forgebook/view-state";
 
 import { isOverlayChecked } from "./overlays.ts";
-import { axeProblems, overlayProblems, spillProblems, watchedErrors } from "./storyCheck.ts";
+import {
+  axeProblems,
+  missingFileWarnings,
+  overlayProblems,
+  type PageFindings,
+  spillProblems,
+  watchedErrors
+} from "./storyCheck.ts";
 import { indexedSource, type StoryFilesOptions } from "./storyFiles.ts";
 import { type PlannedStoryTest, plannedStoryTests } from "./storyTestPlan.ts";
+
+/**
+ * Says a test's missing static files in its report, as `warning` annotations: a missing image or font does not fail the
+ * test, since the story still runs.
+ *
+ * @param findings - what the page's watch found.
+ */
+const annotateMissingFiles = (findings: PageFindings): void => {
+  for (const warning of missingFileWarnings(findings).warnings ?? [])
+    test.info().annotations.push({ type: "warning", description: warning.message });
+};
 
 /**
  * How long a test waits for a frame's answer, in ms: past the 10 s a frame waits by default for what its story loads and
@@ -178,7 +196,7 @@ export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
     test.describe(title, () => {
       for (const { story, variant, hasLookChecks } of planned) {
         test(`${story.name} · ${variant.name}`, async ({ page }) => {
-          const errors = watchedErrors(page);
+          const watched = watchedErrors(page);
           if (variant.width !== undefined) await page.setViewportSize({ width: variant.width, height: 800 });
           // a Live story is checked and pictured at its start: its clock held, so its image never changes;
           // always on its page's own colour, whatever a variant names: a backdrop is for looking
@@ -210,7 +228,9 @@ export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
             return;
           }
           await expectChecksPass(page, { story, variant, hasLookChecks }, catalogue.a11y, check);
-          expect(errors).toEqual([]);
+          const findings = watched();
+          annotateMissingFiles(findings);
+          expect(findings.errors).toEqual([]);
         });
       }
     });

@@ -174,6 +174,11 @@ export const checkText = (report: StoryCheckReport, style: OutputStyle): string 
             result.view || "default",
             `${problem.kind}: ${problem.message}`
           ])),
+      ...(result.warnings ?? []).map((warning) => [
+        result.storyId,
+        result.view || "default",
+        `warning: ${warning.message}`
+      ]),
       ...judgementLines(result)
     ]),
     { columns: [{ header: "Story" }, { header: "View", tone: "muted" }, { header: "Result" }] },
@@ -439,6 +444,10 @@ export const verifyText = (document: VerifyDocument, style: OutputStyle): string
     (each) => `${each.file}${each.line === undefined ? "" : `:${each.line}`}  note: ${each.message}`
   );
   const advice = (document.code.advice ?? []).map((each) => `${each.file}:${each.line}  ${each.message}`);
+  const warnings = document.warnings.map(
+    (each) =>
+      `${each.path}  warning: ${each.message}, in ${each.stories.length === 1 ? "1 story" : `${each.stories.length} stories`}`
+  );
   const results = [
     ...document.failures,
     ...document.notVerified.map((each) => ({ ...each, problems: [] }))
@@ -451,6 +460,7 @@ export const verifyText = (document: VerifyDocument, style: OutputStyle): string
     ...outdated,
     ...notes,
     ...advice,
+    ...warnings,
     ...stories,
     document.summary
   ].join("\n");
