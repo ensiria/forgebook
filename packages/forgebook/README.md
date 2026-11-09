@@ -827,6 +827,11 @@ export const toPanelValue: ArgControlFrameModule["toPanelValue"] = (icon) =>
   `schema`. A `frame` module turns it into what the story receives, in the frame, with `toStoryValue(value, { name,
   settings })`; a value it cannot turn, or a module that fails, leaves the story its own value and says why. Without a
   `frame` module the story receives the JSON value. `toPanelValue`, optional, names a value the story gives itself.
+- **Its code.** The Code tab and `forgebook story` write a value as the story receives it when the control's module
+  exports `toCode(value, argType)`, the expression the attribute holds: `toCode: (name) => name` writes
+  `icon={IconStar}`, not `icon="IconStar"`. Without it, or for a value it gives `undefined`, the JSON value is written;
+  the story file's own code for an arg stays as written until the panel sets it. It runs in the page and on the dev
+  server.
 - **When it loads.** The module loads when the panel first shows a prop it takes, the frame module when a story's frame
   is first given a value of it: neither on the catalogue's first load. A frame reads its story's component docs, to
   know which props a control takes, only once a module may have work: the panel gives a value, the story's `argTypes`

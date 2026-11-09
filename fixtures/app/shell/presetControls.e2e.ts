@@ -155,4 +155,24 @@ test.describe("a preset's control by type", () => {
       expect.stringContaining(encodeURIComponent('{"startIcon":"IconStar"}'))
     );
   });
+
+  test("writes a picked icon in the story's code as the icon, as the story receives it", async ({
+    page,
+    request
+  }) => {
+    await page.goto(CHIP);
+    await pickerOf(page, "startIcon").getByRole("radio", { name: "IconStar" }).check();
+    await expect(frameOf(page).locator('[data-icon="IconStar"]')).toBeVisible();
+    await page.getByRole("tab", { name: "Code" }).click();
+    const code = page.getByRole("tabpanel", { name: "Code" });
+    await expect(code).toContainText("startIcon={IconStar}");
+    await expect(code).not.toContainText('"IconStar"');
+    // the story file's own code for its icon stays as written
+    await page.goto(`${BUTTON}&args=${encodeURIComponent('{"label":"Find"}')}`);
+    await page.getByRole("tab", { name: "Code" }).click();
+    await expect(page.getByRole("tabpanel", { name: "Code" })).toContainText("icon={IconSearch}");
+    const query = new URLSearchParams({ id: "kit:actions-chip--basic", args: '{"endIcon":"IconHeart"}' });
+    const answer: unknown = await (await request.get(`/__forgebook/api/story?${query}`)).json();
+    expect(answer).toHaveProperty("code", '<Chip label="Filter" endIcon={IconHeart} />');
+  });
 });
