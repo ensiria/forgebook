@@ -428,10 +428,23 @@ const argControlLines = (config: ResolvedConfig): string[] => {
     : [
         "    argControls: {",
         ...controls.map(
-          ([name, module]) => `      ${codeLiteral(name)}: () => import(${codeLiteral(module)}),`
+          ([name, { module }]) => `      ${codeLiteral(name)}: () => import(${codeLiteral(module)}),`
         ),
         "    },"
       ];
+};
+
+/**
+ * The frame's list of the custom controls' frame modules, each with the import that loads it when the shell first gives
+ * the story a value of that control; nothing for a catalogue whose controls have none.
+ *
+ * @param config - the configuration.
+ */
+const argControlFrameLines = (config: ResolvedConfig): string[] => {
+  const frames = Object.entries(config.argControls).flatMap(([name, { frame }]) =>
+    frame === undefined ? [] : [`      ${codeLiteral(name)}: () => import(${codeLiteral(frame)}),`]
+  );
+  return frames.length === 0 ? [] : ["    argControls: {", ...frames, "    },"];
 };
 
 /**
@@ -561,6 +574,7 @@ export const frameEntry = (config: ResolvedConfig, axe?: AxeAddress): string => 
     "    lists: config.lists,",
     "    frames: config.frames,",
     ...(config.hasPlayTools ? [playToolsLoader()] : []),
+    ...argControlFrameLines(config),
     ...(frames.length === 0
       ? []
       : [

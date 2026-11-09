@@ -232,7 +232,7 @@ describe("the message that gives a frame its values", () => {
     // the check's, the message's type, and the frame that hears it and its guard
     expect(writers).toEqual([
       "addressArgs.ts",
-      "frame/mountFrame.ts",
+      "frame/panelControls.ts",
       "frame/shellMessageCheck.ts",
       "messages.ts"
     ]);

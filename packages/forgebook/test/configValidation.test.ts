@@ -215,19 +215,116 @@ describe("the quick walk that tells a pattern matches", () => {
 });
 
 describe("argControls", () => {
-  const withControls = (argControls: Readonly<Record<string, string>>): ReturnType<typeof resolveConfig> =>
+  const withControls = (argControls: Readonly<Record<string, unknown>>): ReturnType<typeof resolveConfig> =>
     resolveConfig(withExtra(JSON.stringify({ argControls })), "/catalogue");
+  const withPresets = (
+    argControls: Readonly<Record<string, unknown>> | undefined,
+    ...presets: readonly Readonly<Record<string, unknown>>[]
+  ): ReturnType<typeof resolveConfig> =>
+    resolveConfig(
+      withExtra(
+        JSON.stringify({
+          ...(argControls === undefined ? {} : { argControls }),
+          presets: presets.map((controls, index) => ({ name: `preset${index}`, argControls: controls }))
+        })
+      ),
+      "/catalogue"
+    );
 
   it("resolves a path from the configuration's folder, and keeps a package's specifier", () => {
     const { a, b } = withControls({ a: "./a.ts", b: "@acme/b" }).argControls;
     // on Windows, under the drive's letter
-    expect(a).toMatch(/\/catalogue\/a\.ts$/);
-    expect(b).toBe("@acme/b");
+    expect(a?.module).toMatch(/\/catalogue\/a\.ts$/);
+    expect(b).toEqual({ module: "@acme/b", matches: [] });
   });
 
   it("refuses a name of the panel's, a name no story can write, and no module", () => {
     expect(() => withControls({ select: "./a.ts" })).toThrow(/control of the panel/);
     expect(() => withControls({ "a b": "./a.ts" })).toThrow(/no name/);
     expect(() => withControls({ a: "" })).toThrow(/names no module/);
+    expect(() => withControls({ a: { frame: "./f.ts" } })).toThrow(/names no module/);
+  });
+
+  it("reads a control's frame module and its matches, one or a list", () => {
+    const { icon, badge } = withControls({
+      icon: { module: "./icon.ts", frame: "./iconValue.ts", matches: { typeName: "IconComponent" } },
+      badge: {
+        module: "@acme/badge",
+        matches: [{ propName: "badge" }, { typeName: "Badge", propName: "tag" }]
+      }
+    }).argControls;
+    expect(icon?.frame).toMatch(/\/catalogue\/iconValue\.ts$/);
+    expect(icon?.matches).toEqual([{ typeName: "IconComponent" }]);
+    expect(badge?.matches).toEqual([{ propName: "badge" }, { typeName: "Badge", propName: "tag" }]);
+  });
+
+  it("refuses a match that names nothing, a key it does not read, and a key of the control it does not read", () => {
+    expect(() => withControls({ a: { module: "./a.ts", matches: {} } })).toThrow(/names a typeName/);
+    expect(() => withControls({ a: { module: "./a.ts", matches: { type: "X" } } })).toThrow(/no key "type"/);
+    expect(() => withControls({ a: { module: "./a.ts", matches: { typeName: "" } } })).toThrow(/no name/);
+    expect(() => withControls({ a: { module: "./a.ts", match: {} } })).toThrow(/no key "match"/);
+    expect(() => withControls({ a: { module: "./a.ts", matches: ["IconComponent"] } })).toThrow(
+      /is an object/
+    );
+  });
+
+  it("takes a preset's controls with the same checks, after the catalogue's", () => {
+    expect(() =>
+      withPresets({ own: "./own.ts" }, { icon: { module: "/kit/icon.ts" }, select: "/x.ts" })
+    ).toThrow(/preset "preset0": argControls: "select" is a control of the panel/);
+    const merged = withPresets(
+      { own: "./own.ts" },
+      { icon: { module: "/kit/icon.ts", matches: { typeName: "IconComponent" } } }
+    ).argControls;
+    expect(Object.keys(merged)).toEqual(["own", "icon"]);
+    expect(merged["icon"]).toEqual({ module: "/kit/icon.ts", matches: [{ typeName: "IconComponent" }] });
+  });
+
+  it("lets the catalogue's control of a name replace a preset's, a later preset's an earlier one's, and false remove it", () => {
+    const replaced = withPresets(
+      { icon: "./mine.ts" },
+      { icon: "/kit/icon.ts", star: "/kit/star.ts" }
+    ).argControls;
+    expect(Object.keys(replaced)).toEqual(["icon", "star"]);
+    expect(replaced["icon"]?.module).toMatch(/\/catalogue\/mine\.ts$/);
+    const later = withPresets(undefined, { icon: "/one/icon.ts" }, { icon: "/two/icon.ts" }).argControls;
+    expect(later["icon"]?.module).toBe("/two/icon.ts");
+    expect(Object.keys(withPresets({ icon: false }, { icon: "/kit/icon.ts" }).argControls)).toEqual([]);
+  });
+
+  it("refuses an address for a module, a list that is no object, and a removal that removes nothing", () => {
+    expect(() => withControls({ a: "https://example.com/a.js" })).toThrow(/names an address/);
+    expect(() => withControls({ a: "data:text/javascript,alert(1)" })).toThrow(/names an address/);
+    expect(withControls({ a: "C:/controls/a.ts" }).argControls["a"]?.module).toMatch(/a\.ts$/);
+    const listed = (): unknown =>
+      resolveConfig(
+        withExtra(JSON.stringify({ presets: [{ name: "listed", argControls: ["/a.ts"] }] })),
+        "/catalogue"
+      );
+    expect(listed).toThrow(/an object of controls by name/);
+    expect(() => withPresets({ icno: false }, { icon: "/kit/icon.ts" })).toThrow(
+      /"icno" is no preset's control/
+    );
+  });
+
+  it("refuses a preset that takes every prop of a keyword type, but not one prop of it", () => {
+    expect(() =>
+      withPresets(undefined, { all: { module: "/k.ts", matches: { typeName: "string" } } })
+    ).toThrow(/takes no "string" prop by its type alone/);
+    const named = withPresets(undefined, {
+      tone: { module: "/k.ts", matches: { typeName: "string", propName: "tone" } }
+    });
+    expect(named.argControls["tone"]?.matches).toEqual([{ typeName: "string", propName: "tone" }]);
+  });
+
+  it("refuses a preset's relative path, which would be read from the catalogue's folder, and its false", () => {
+    expect(() => withPresets(undefined, { icon: "./icon.ts" })).toThrow(/absolute path or package/);
+    expect(() => withPresets(undefined, { icon: { module: "/kit/icon.ts", frame: "./v.ts" } })).toThrow(
+      /its frame: a preset names a module by absolute path/
+    );
+    expect(() => withPresets(undefined, { icon: false })).toThrow(/only a catalogue removes/);
+    expect(withPresets(undefined, { icon: "@kit/ui/icon-control" }).argControls["icon"]?.module).toBe(
+      "@kit/ui/icon-control"
+    );
   });
 });

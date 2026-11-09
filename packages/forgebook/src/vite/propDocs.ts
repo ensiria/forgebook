@@ -259,6 +259,61 @@ const declaredMembers = (node: ts.TypeNode): ts.TypeNode[] => {
 };
 
 /**
+ * The names a type node goes by: a plain reference's name as written, the name it was declared with (an import may
+ * rename it), and the names of the aliases it is declared through (`type ButtonIcon = IconComponent`); for a union, the
+ * names every member goes by, without `undefined`, `null` and `never`. A generic's reference (`ComponentType<Props>`) and a
+ * type parameter name no type of their own, so they end the walk.
+ *
+ * @param node - the type node.
+ * @param checker - the type checker, to follow a name to its declaration.
+ * @param seen - the nodes already walked, so a recursive alias ends.
+ */
+const typeNamesOf = (node: ts.TypeNode, checker: ts.TypeChecker, seen: ReadonlySet<ts.Node>): string[] => {
+  const bare = bareType(node);
+  if (seen.has(bare)) return [];
+  const walked = new Set([...seen, bare]);
+  if (ts.isUnionTypeNode(bare)) return sharedNames(declaredMembers(bare), checker, walked);
+  if (!ts.isTypeReferenceNode(bare) || bare.typeArguments !== undefined) return [];
+  const symbol = declaredSymbol(checker.getSymbolAtLocation(bare.typeName), checker);
+  if (symbol === undefined || symbol.flags & ts.SymbolFlags.TypeParameter) return [];
+  // a default export's symbol is named `default`: its declaration keeps the name it was written with
+  const declared = ts.getNameOfDeclaration(symbol.declarations?.[0])?.getText() ?? bare.typeName.getText();
+  const alias = symbol.declarations?.find(ts.isTypeAliasDeclaration);
+  const through =
+    alias !== undefined && !alias.typeParameters ? typeNamesOf(alias.type, checker, walked) : [];
+  return [...new Set([bare.typeName.getText(), declared, ...through])];
+};
+
+/**
+ * The names every one of several type nodes goes by, in the first one's order.
+ *
+ * @param nodes - the type nodes: a union's members, or a prop's declarations.
+ * @param checker - the type checker.
+ * @param seen - the nodes already walked.
+ */
+const sharedNames = (
+  nodes: readonly ts.TypeNode[],
+  checker: ts.TypeChecker,
+  seen: ReadonlySet<ts.Node>
+): string[] => {
+  const [first, ...others] = nodes.map((node) => typeNamesOf(node, checker, seen));
+  return (first ?? []).filter((name) => others.every((names) => names.includes(name)));
+};
+
+/**
+ * The names a prop's declared types all go by: what a custom control's `matches` reads. A branch of the props where the
+ * prop is `never` takes no value, so it names no type; a method names none.
+ *
+ * @param declared - the prop's declared types.
+ * @param checker - the program's checker.
+ */
+const writtenTypeNames = (declared: readonly DeclaredType[], checker: ts.TypeChecker): string[] => {
+  const taking = declared.filter((node) => ts.isMethodSignature(node) || declaredMembers(node).length > 0);
+  const nodes = taking.flatMap((node): ts.TypeNode[] => (ts.isMethodSignature(node) ? [] : [node]));
+  return nodes.length === taking.length ? sharedNames(nodes, checker, new Set()) : [];
+};
+
+/**
  * A prop's declared type nodes: a property's type (in a type or a class) or a method's whole signature, once per
  * declaration. A prop of props written as alternatives (`{ indicator?: never } | { indicator?: "dot" | "spinner" }`)
  * has one per branch.
@@ -516,13 +571,17 @@ export const propDocs = (
     kind === "other" &&
     [type, ...variantTypes].every((each) => checker.isTypeAssignableTo(checker.getStringType(), each));
   const notes = propTypeNotes(declared, type, checker, generic);
+  const typeText =
+    choices === undefined
+      ? (writtenText(declared, generic, checker) ?? checker.typeToString(type))
+      : choiceTypeText(choices);
+  const typeNames = writtenTypeNames(declared, checker);
   return {
     name,
     kind,
-    type:
-      choices === undefined
-        ? (writtenText(declared, generic, checker) ?? checker.typeToString(type))
-        : choiceTypeText(choices),
+    type: typeText,
+    // only when they say more than the type's text
+    ...(typeNames.some((each) => each !== typeText) ? { typeNames } : {}),
     description: summaryOf(symbol, checker),
     isRequired: (symbol.flags & ts.SymbolFlags.Optional) === 0,
     ...(defaultValue === undefined ? {} : { defaultValue }),

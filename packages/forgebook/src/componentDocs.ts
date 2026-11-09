@@ -146,12 +146,24 @@ export type PropDocs = {
    * union by the types it happened to meet first, so it changed between reads of a program kept in memory.
    */
   readonly type: string;
+  /**
+   * The names its type goes by, when they are more than `type`: the name written, the name it was declared with when an
+   * import renamed it, and each alias it is declared through (`ButtonIcon`, `IconComponent` for
+   * `type ButtonIcon = IconComponent`), without `undefined` and `null`; for a union, the names every member goes by. Left
+   * out when `type` says them all.
+   */
+  readonly typeNames?: readonly string[];
   /** The first paragraph of its TSDoc; empty when it has none. */
   readonly description: string;
   /** Its `@defaultValue`, when the TSDoc gives one. */
   readonly defaultValue?: string;
   /** Whether the prop must be passed. */
   readonly isRequired: boolean;
+  /**
+   * The custom control the catalogue gives it by its type or its name (a control's `matches`), when one does: the
+   * plugin adds it as it serves the docs, so the panel draws it in every story that names no control for the prop.
+   */
+  readonly customControl?: string;
   /** For a choice, its values in the order of the type. */
   readonly choices?: readonly (string | number)[];
   /** For an event, its signature. */
@@ -292,7 +304,11 @@ const isMemberDocs = (value: unknown): value is MemberDocs =>
 /** Whether a value is a note with a reason: what the reference reads first. */
 const isNote = (value: unknown): boolean => isRecord(value) && typeof value["reason"] === "string";
 
-/** Whether a value is one prop's docs. */
+/**
+ * Whether a value is one prop's docs. Some fields are left to what reads them, as a choice's values and a signature are:
+ * a custom control's name is only looked up among the catalogue's own controls, so a wrong one finds none and says so
+ * beside the field; the shell reads no type's names.
+ */
 const isPropDocs = (value: unknown): value is PropDocs =>
   isRecord(value) &&
   typeof value["name"] === "string" &&

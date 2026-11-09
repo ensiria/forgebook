@@ -110,3 +110,21 @@ export const customChecksOf = async (
     )
   );
 };
+
+/**
+ * A control's texts as the catalogue words them: its `strings` under `argControls.<name>.`, by the rest of the key.
+ *
+ * @param strings - the catalogue's replaced texts.
+ * @param name - the control's name.
+ */
+export const controlStringsOf = (
+  strings: Readonly<Record<string, string>>,
+  name: string
+): Readonly<Record<string, string>> => {
+  const prefix = `argControls.${name}.`;
+  return Object.fromEntries(
+    Object.entries(strings).flatMap(([key, text]): [string, string][] =>
+      key.startsWith(prefix) && key.length > prefix.length ? [[key.slice(prefix.length), text]] : []
+    )
+  );
+};
