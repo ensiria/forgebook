@@ -1,7 +1,7 @@
 /**
  * The tests the browser suite declares for each story: a story about its looks in every variant, with the layout
- * checks; a story about logic (`parameters.logic`) once, in the catalogue's default view, without them, and never
- * pictured.
+ * checks; a story about logic (`parameters.logic`) once, in the catalogue's default view or the first view of a run
+ * that names its own variants, without them, and never pictured.
  *
  * @remarks
  * A logic story is a hook's or a function's scene: the variants (themes, contrast, the structure only, a narrow frame)
@@ -19,6 +19,20 @@ import type { StoryVariant } from "./browserTests.ts";
 
 /** The one variant a logic story is tested in: the catalogue's default view. */
 export const LOGIC_VARIANT: StoryVariant = { name: "logic", view: {} };
+
+/**
+ * The one variant a logic story is tested in within a run: a run that names its own variants may hold what the default
+ * view cannot draw on (a dark system scheme, forced colours), so the story takes the view of that run's first variant,
+ * or it would draw light values on a dark canvas and report contrast no page has. Its width stays the test browser's:
+ * that is a layout's, and a logic story's layout is not checked.
+ *
+ * @param ownVariants - the variants the run names; none for those of the catalogue.
+ * @returns the variant, named `logic` either way.
+ */
+export const logicVariantOf = (ownVariants: readonly StoryVariant[] | undefined): StoryVariant => {
+  const first = ownVariants?.[0];
+  return first === undefined ? LOGIC_VARIANT : { name: LOGIC_VARIANT.name, view: first.view };
+};
 
 /** One test the suite declares. */
 export type PlannedStoryTest = {
@@ -43,13 +57,15 @@ export const hasLookChecks = (story: { readonly isLogic?: boolean }): boolean =>
  * @param stories - the stories.
  * @param variants - the variants a story about its looks is tested in.
  * @param isScreenshot - whether the run compares reference images instead of running the checks.
+ * @param logicVariant - the variant a story about logic is tested in; the catalogue's default view by default.
  */
 export const plannedStoryTests = (
   stories: readonly TreeStory[],
   variants: readonly StoryVariant[],
-  isScreenshot: boolean
+  isScreenshot: boolean,
+  logicVariant: StoryVariant = LOGIC_VARIANT
 ): PlannedStoryTest[] =>
   stories.flatMap((story): PlannedStoryTest[] => {
     if (hasLookChecks(story)) return variants.map((variant) => ({ story, variant, hasLookChecks: true }));
-    return isScreenshot ? [] : [{ story, variant: LOGIC_VARIANT, hasLookChecks: false }];
+    return isScreenshot ? [] : [{ story, variant: logicVariant, hasLookChecks: false }];
   });

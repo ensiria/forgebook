@@ -37,7 +37,7 @@ import {
   watchedErrors
 } from "./storyCheck.ts";
 import { indexedSource, type StoryFilesOptions } from "./storyFiles.ts";
-import { type PlannedStoryTest, plannedStoryTests } from "./storyTestPlan.ts";
+import { logicVariantOf, type PlannedStoryTest, plannedStoryTests } from "./storyTestPlan.ts";
 
 /**
  * Says a test's missing static files in its report, as `warning` annotations: a missing image or font does not fail the
@@ -189,7 +189,8 @@ export const storyBrowserTests = (options: StoryBrowserTestsOptions): void => {
     const planned = plannedStoryTests(
       locations.map((location) => location.story),
       variants,
-      screenshot
+      screenshot,
+      logicVariantOf(options.variants)
     );
     // a component whose stories are all about logic has nothing to picture
     if (planned.length === 0) continue;

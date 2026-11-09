@@ -8,7 +8,7 @@ import type { TreeStory } from "forgebook/story-tree";
 import { describe, expect, it } from "vitest";
 
 import type { StoryVariant } from "../src/browserTests.ts";
-import { hasLookChecks, LOGIC_VARIANT, plannedStoryTests } from "../src/storyTestPlan.ts";
+import { hasLookChecks, LOGIC_VARIANT, logicVariantOf, plannedStoryTests } from "../src/storyTestPlan.ts";
 
 /** The variants of a catalogue: two themes and a narrow frame. */
 const VARIANTS: readonly StoryVariant[] = [
@@ -73,6 +73,18 @@ describe("the tests of each story", () => {
   it("tests a story about logic once, in the default view, without the layout checks", () => {
     expect(planned([storyOf("undo", true)], false)).toEqual(["undo · logic"]);
     expect(LOGIC_VARIANT).toEqual({ name: "logic", view: {} });
+  });
+
+  it("draws a story about logic in the first view of a run that names its own variants", () => {
+    const dark = { name: "forced-dark", view: { switches: { theme: "dark" } }, width: 480 };
+    const [test] = plannedStoryTests([storyOf("undo", true)], [dark], false, logicVariantOf([dark]));
+    expect(test?.variant).toEqual({ name: "logic", view: { switches: { theme: "dark" } } });
+    expect(test?.hasLookChecks).toBe(false);
+  });
+
+  it("keeps the catalogue's default view for a story about logic when the run names no variants", () => {
+    expect(logicVariantOf(undefined)).toBe(LOGIC_VARIANT);
+    expect(logicVariantOf([])).toBe(LOGIC_VARIANT);
   });
 
   it("pictures only the stories about their looks", () => {
