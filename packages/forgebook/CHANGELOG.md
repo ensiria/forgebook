@@ -1,3 +1,23 @@
+## 0.4.2 (2026-11-09)
+
+### 🚀 Features
+
+- **plugin:** plugins from presets, and messages from a tab to its frame ([76f2abfe](https://github.com/ensiria/forgebook/commit/76f2abfe))
+- **init:** set the theme as a .dark class where the app draws dark so ([fd321be4](https://github.com/ensiria/forgebook/commit/fd321be4))
+
+### 🩹 Fixes
+
+- **react:** keep useStoryText's function while the language stays ([6c065d51](https://github.com/ensiria/forgebook/commit/6c065d51))
+- **forgebook:** wait for the modules a story imports while first drawn ([9cb9ac28](https://github.com/ensiria/forgebook/commit/9cb9ac28))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.3.2
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.4.1 (2026-11-09)
 
 ### 🚀 Features

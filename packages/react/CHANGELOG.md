@@ -1,3 +1,19 @@
+## 0.2.7 (2026-11-09)
+
+### 🩹 Fixes
+
+- **react:** keep useStoryText's function while the language stays ([6c065d51](https://github.com/ensiria/forgebook/commit/6c065d51))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.3.2
+- Updated forgebook to 0.4.2
+- Updated @forgebook/testing to 0.2.7
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.2.6 (2026-11-09)
 
 ### 🚀 Features

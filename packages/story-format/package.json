@@ -1,6 +1,6 @@
 {
   "name": "@forgebook/story-format",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "The story format of Forgebook: the CSF 3 types a story file is written with, generic over a framework, the StorySource a package hands a catalogue, the texts inside the stories in the shown language, and the story clock a Live story reads. No dependency: a library's stories depend on their framework's package, never on the catalogue that shows them.",
   "keywords": [
     "stories",

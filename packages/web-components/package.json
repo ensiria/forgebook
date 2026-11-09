@@ -1,6 +1,6 @@
 {
   "name": "@forgebook/web-components",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Forgebook for Web Components, Lit first: the story types, the renderer the frame mounts a custom element story with, and the adapter that reads attributes, properties, events, slots and parts from the Custom Elements Manifest.",
   "license": "MIT",
   "repository": {

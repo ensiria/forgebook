@@ -1,6 +1,6 @@
 {
   "name": "@forgebook/plugin-figma",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Figma for Forgebook: a story's design in the panel, embedded from Figma and beside the story, and a design in a docs page.",
   "keywords": [
     "forgebook",

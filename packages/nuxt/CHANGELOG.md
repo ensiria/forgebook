@@ -1,3 +1,20 @@
+## 0.2.7 (2026-11-09)
+
+### 🩹 Fixes
+
+- **nuxt:** draw shadcn-nuxt components and run the preview's setup ([9f1b2ff2](https://github.com/ensiria/forgebook/commit/9f1b2ff2))
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.3.2
+- Updated forgebook to 0.4.2
+- Updated @forgebook/testing to 0.2.7
+- Updated @forgebook/vue to 0.2.7
+
+### ❤️ Thank You
+
+- JasonScoppetta @JasonScoppetta
+
 ## 0.2.6 (2026-11-09)
 
 ### 🧱 Updated Dependencies

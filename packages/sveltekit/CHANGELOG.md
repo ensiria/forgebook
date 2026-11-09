@@ -1,3 +1,12 @@
+## 0.2.7 (2026-11-09)
+
+### 🧱 Updated Dependencies
+
+- Updated @forgebook/story-format to 0.3.2
+- Updated forgebook to 0.4.2
+- Updated @forgebook/testing to 0.2.7
+- Updated @forgebook/svelte to 0.2.7
+
 ## 0.2.6 (2026-11-09)
 
 ### 🧱 Updated Dependencies

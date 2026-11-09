@@ -1,6 +1,6 @@
 {
   "name": "@forgebook/react",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Forgebook for React: the story types and hooks, the renderer the frame mounts a story with, and the adapter that reads a React component's props.",
   "license": "MIT",
   "repository": {
