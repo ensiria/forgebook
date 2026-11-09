@@ -3083,8 +3083,9 @@
     flex-direction: column;
     gap: $space-1-5;
 
+    // a switch keeps its own drawing (`.forgebook-switch`)
     select,
-    input,
+    input:not(.forgebook-switch),
     textarea {
       box-sizing: border-box;
       height: 1.625rem;
@@ -3106,7 +3107,7 @@
       resize: vertical;
     }
 
-    input[type="checkbox"],
+    input[type="checkbox"]:not(.forgebook-switch),
     input[type="radio"] {
       height: auto;
       box-shadow: none;
@@ -3160,12 +3161,6 @@
     color: $text-tertiary;
   }
 
-  .forgebook-toggle-row {
-    display: inline-flex;
-    align-items: center;
-    gap: $space-1;
-  }
-
   .forgebook-prop__head {
     display: flex;
     align-items: center;
@@ -3185,7 +3180,7 @@
     display: flex;
     gap: $space-1-5;
 
-    > input:first-child {
+    > input:first-child:not(.forgebook-switch) {
       flex: 1;
       min-width: 0;
     }
