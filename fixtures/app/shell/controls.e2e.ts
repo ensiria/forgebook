@@ -80,7 +80,7 @@ test.describe("the panel's controls for values of any shape", () => {
     await page.getByRole("button", { name: "Add to rows" }).click();
     await expectReceived(page, { rows: [{ id: 0, label: "" }] });
     await page.getByRole("textbox", { name: "rows 1 label" }).fill("primo");
-    await page.getByRole("checkbox", { name: "rows 1 isDone" }).check();
+    await page.getByRole("switch", { name: "rows 1 isDone" }).check();
     await expectReceived(page, { rows: [{ id: 0, label: "primo", isDone: true }] });
   });
 
@@ -325,5 +325,78 @@ test.describe("the panel's order", () => {
       "size",
       "backgroundColor"
     ]);
+  });
+});
+
+test.describe("a boolean prop's switch", () => {
+  test("lays out as every field, turns by click, Space and Enter, and goes back with its reset and Reset", async ({
+    page
+  }) => {
+    await page.goto("/?story=kit:inputs-selection-select--overview&tab=props");
+    const select = page.frameLocator("iframe.forgebook-frame-view").locator("select");
+    await expect(select).toBeEnabled();
+    const field = page
+      .locator(".forgebook-prop")
+      .filter({ has: page.getByRole("switch", { name: "isDisabled" }) });
+    const toggle = field.getByRole("switch", { name: "isDisabled" });
+    await expect(toggle).not.toBeChecked();
+    // the name on the head row, the switch under it, as a text or a select field's control
+    const head = await field.locator(".forgebook-prop__head").boundingBox();
+    const control = await toggle.boundingBox();
+    expect(control?.y ?? 0).toBeGreaterThanOrEqual((head?.y ?? 0) + (head?.height ?? 0));
+    await expect(field.locator(".forgebook-prop__head .forgebook-prop__name")).toHaveText("isDisabled");
+    await toggle.click();
+    await expect(toggle).toBeChecked();
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await expect(select).toBeDisabled();
+    // the ways back sit on the head row, at its end
+    await expect(
+      field.locator(".forgebook-prop__head").getByRole("button", { name: /back to the story's value/ })
+    ).toBeVisible();
+    await toggle.press("Space");
+    await expect(toggle).not.toBeChecked();
+    await expect(select).toBeEnabled();
+    await toggle.press("Enter");
+    await expect(toggle).toBeChecked();
+    await expect(select).toBeDisabled();
+    await field.getByRole("button", { name: "isDisabled: back to the story's value" }).click();
+    await expect(toggle).not.toBeChecked();
+    await expect(select).toBeEnabled();
+    await toggle.click();
+    await expect(select).toBeDisabled();
+    await page.locator(".forgebook-tab-foot").getByRole("button", { name: "Reset" }).click();
+    await expect(toggle).not.toBeChecked();
+    await expect(select).toBeEnabled();
+  });
+});
+
+test.describe("the panel's actions", () => {
+  test("Reset and Worst case stay at the bottom of the panel while the props scroll, the last prop above them", async ({
+    page
+  }) => {
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await open(page, story("filled", "tab=props"));
+    const body = page.locator(".forgebook-dock__body");
+    const foot = page.locator(".forgebook-tab-foot");
+    const lastGroup = page.locator(".forgebook-tab-props > :nth-last-child(2)");
+    await expect(foot.getByRole("button", { name: "Reset" })).toBeVisible();
+    // the story's props must be more than the panel holds, or nothing here scrolls
+    expect(await body.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+    /** How far the bar's bottom is from the panel's visible bottom, in pixels. */
+    const gapBelowFoot = (): Promise<number> =>
+      page.evaluate(() => {
+        const scroller = document.querySelector(".forgebook-dock__body");
+        const bar = document.querySelector(".forgebook-tab-foot");
+        if (scroller === null || bar === null) return Number.NaN;
+        return Math.abs(scroller.getBoundingClientRect().bottom - bar.getBoundingClientRect().bottom);
+      });
+    await expect(foot).toBeInViewport({ ratio: 1 });
+    expect(await gapBelowFoot()).toBeLessThan(1);
+    await body.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+    await expect(foot).toBeInViewport({ ratio: 1 });
+    expect(await gapBelowFoot()).toBeLessThan(1);
+    const footTop = (await foot.boundingBox())?.y ?? 0;
+    const lastBox = await lastGroup.boundingBox();
+    expect((lastBox?.y ?? Number.POSITIVE_INFINITY) + (lastBox?.height ?? 0)).toBeLessThanOrEqual(footTop);
   });
 });

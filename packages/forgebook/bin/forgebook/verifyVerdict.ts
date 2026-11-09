@@ -15,7 +15,7 @@
  * @module
  */
 import { shellWord } from "../../src/shellWord.ts";
-import type { StoryCheckReport, StoryCheckResult } from "../../src/storyCheck.ts";
+import type { StoryCheckReport, StoryCheckResult, StoryWarning } from "../../src/storyCheck.ts";
 import type {
   ChangedStoriesDocument,
   ChangedUiFile,
@@ -25,6 +25,7 @@ import type {
   VerifyFailure,
   VerifyNotVerified,
   VerifyVerdict,
+  VerifyWarning,
   VisibilityDocument
 } from "../../src/vite/agent.types.ts";
 import { type BaseRun, splitByBase } from "./verifyBase.ts";
@@ -299,6 +300,33 @@ const failuresOf = (
       return { storyId, view, problems: found, ...(storyLinks === undefined ? {} : { links: storyLinks }) };
     });
 
+/**
+ * The warnings of the pairs that ran, one per file, with the stories that asked for it.
+ *
+ * @param results - the pairs that ran.
+ */
+const warningsOf = (results: readonly StoryCheckResult[]): VerifyWarning[] => {
+  const byPath = new Map<string, { warning: StoryWarning; stories: Set<string> }>();
+  for (const result of results)
+    for (const warning of result.warnings ?? []) {
+      const found = byPath.get(warning.path) ?? { warning, stories: new Set<string>() };
+      found.stories.add(result.storyId);
+      byPath.set(warning.path, found);
+    }
+  return [...byPath.values()].map(({ warning, stories }) => ({ ...warning, stories: [...stories] }));
+};
+
+/**
+ * The end of the verdict's line for the warnings: a missing file does not change the verdict, so the line names it, so
+ * it is not missed; nothing without any.
+ *
+ * @param warnings - the warnings.
+ */
+const warningWords = (warnings: readonly VerifyWarning[]): string =>
+  warnings.length === 0
+    ? ""
+    : `; ${counted(warnings.length, "warning")}: ${warnings.map((each) => `${each.path} is missing`).join(", ")}`;
+
 /** What the comparison with the base leaves unchecked: a base that could not run, stories it never saw. */
 const baseSkips = (compared: ReturnType<typeof comparedWithBase>): string[] => [
   ...(compared.notCompared === undefined
@@ -328,6 +356,7 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
   const uiFiles = changed.uiFiles.map((file) => verifiedFile(file, ran, notRun));
   const links = new Map(changed.stories.map((story) => [story.id, story.links]));
   const failures = failuresOf(results, links);
+  const warnings = warningsOf(results);
   const notVerified = results.flatMap(({ storyId, view, notVerified: reason }): VerifyNotVerified[] => {
     if (reason === undefined) return [];
     const storyLinks = links.get(storyId);
@@ -383,6 +412,7 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
     ran: seenResults.length,
     failures,
     notVerified,
+    warnings,
     code: {
       checked: code.checked,
       problems: codeProblems,
@@ -404,6 +434,6 @@ export const verifyDocument = (input: VerifyFindings): VerifyDocument => {
     existingProblems === 0
       ? ""
       : `; ${counted(existingProblems, "problem")} the stories had before the change not counted (existing; --all-problems counts them)`;
-  const summary = `${summaryOf({ ...body, verdict, skipped: allSkipped }, catalogueProblems)}${old}`;
+  const summary = `${summaryOf({ ...body, verdict, skipped: allSkipped }, catalogueProblems)}${old}${warningWords(warnings)}`;
   return { schema: 2, verdict, summary, skipped: allSkipped, ...body };
 };

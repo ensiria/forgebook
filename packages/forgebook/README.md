@@ -1632,6 +1632,11 @@ its `frame-src`, in the preview's `frameDomains`).
 - **`server.fs.deny` wins over your globs.** A file it refuses stays out of the catalogue, its search and "Used in", with
   a warning. A file your globs name outside `server.fs.allow` is listed and served, as Vite serves any file a module of
   the project imports.
+- **A missing file is a 404, never your app's page.** The catalogue's two pages are its own, so the dev server has no
+  single-page fallback: a story's image under a path nothing serves answers 404, and the checks list it among their
+  warnings by its path, without failing.
+  Your app's `index.html` is never served, so its entry and every package it reaches stay unloaded. A Vite configuration
+  of your own that runs the plugin and sets `appType` keeps it.
 
 A command, an agent or `curl` sends no browser headers: `forgebook mcp`, `forgebook stories` and the agent API
 (`/__forgebook/api/`) work as usual, and anyone who can reach the port can use them. With `--host` that means your whole
