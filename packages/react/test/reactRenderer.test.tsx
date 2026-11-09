@@ -15,7 +15,7 @@ import {
   readPreview,
   readStory
 } from "forgebook/story-module";
-import { forwardRef, lazy, memo, type ReactNode, Suspense, useState } from "react";
+import { forwardRef, lazy, memo, type ReactNode, Suspense, useMemo, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { awaitedRenderToString, reactRenderer } from "../src/reactRenderer.tsx";
@@ -76,6 +76,25 @@ const Memoized = memo(({ name }: { readonly name?: unknown }): ReactNode => <b>{
 const Forwarded = forwardRef<HTMLElement, { readonly name?: unknown }>(({ name }, ref) => (
   <i ref={ref}>{String(name)}</i>
 ));
+
+/** What the columns' story saw: each text function it was handed, and how often its memo was built. */
+const columnsSeen = { functions: new Set<unknown>(), builds: 0 };
+
+/** A story that builds its columns from the texts, as a data grid's story does. */
+const Columns = ({ name }: { readonly name?: unknown }): ReactNode => {
+  const text = useStoryText();
+  columnsSeen.functions.add(text);
+  const columns = useMemo(() => {
+    columnsSeen.builds += 1;
+    return [text("hello")];
+  }, [text]);
+  const [clicks, setClicks] = useState(0);
+  return (
+    <button type="button" onClick={(): void => setClicks(clicks + 1)}>
+      {columns.join()} {String(name)} {clicks}
+    </button>
+  );
+};
 
 describe("reactRenderer", () => {
   it("renders a story on the server inside the catalogue's decorators, which read its globals, with its texts", async () => {
@@ -194,5 +213,36 @@ describe("reactRenderer", () => {
     await expect(awaitedRenderToString({ ...drawing({}), story }, AbortSignal.timeout(5000))).rejects.toThrow(
       "No greeting for boom"
     );
+  });
+
+  it("keeps the text function while the language stays, so a memo keyed on it is built again only on a switch", async () => {
+    const italian = { hello: "Ciao" };
+    const english = { hello: "Hello" };
+    const columnsDrawing = (name: string, texts: Record<string, string>): StoryDrawing => ({
+      ...drawing({ name }),
+      story: loaded({
+        render: (storyArgs: { readonly name?: unknown }) => <Columns name={storyArgs.name} />
+      }),
+      texts
+    });
+    const canvas = document.createElement("div");
+    document.body.append(canvas);
+    const mounted = reactRenderer.mount(canvas, columnsDrawing("Ada", italian), () => undefined);
+    await mounted.drawn;
+    // a render of its own, then new args: the language is the same
+    canvas.querySelector("button")?.click();
+    await vi.waitFor(() => expect(canvas.textContent).toBe("Ciao Ada 1"));
+    mounted.update(columnsDrawing("Grace", italian));
+    await vi.waitFor(() => expect(canvas.textContent).toBe("Ciao Grace 1"));
+    expect(columnsSeen.functions.size).toBe(1);
+    expect(columnsSeen.builds).toBe(1);
+    // the language switches: a new function, and the memo built again, once
+    mounted.update(columnsDrawing("Grace", english));
+    await vi.waitFor(() => expect(canvas.textContent).toBe("Hello Grace 1"));
+    canvas.querySelector("button")?.click();
+    await vi.waitFor(() => expect(canvas.textContent).toBe("Hello Grace 2"));
+    expect(columnsSeen.functions.size).toBe(2);
+    expect(columnsSeen.builds).toBe(2);
+    mounted.unmount();
   });
 });

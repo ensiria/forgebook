@@ -65,12 +65,12 @@ export const textTable = async (texts: StoryTexts | undefined): Promise<StoryTex
 };
 
 /**
- * The texts of the shown language.
+ * Reads the texts of a language: the work of `shownTexts`, each time anew.
  *
  * @param texts - the source's tables or their loaders, by language id; none when the source has none.
  * @param language - the shown language, when one is chosen; none for the stories' own (English).
  */
-export const shownTexts = async (
+const readShownTexts = async (
   texts: StorySource["texts"],
   language: StoryLanguage | undefined
 ): Promise<StoryTextTable> => {
@@ -82,6 +82,37 @@ export const shownTexts = async (
     return Object.fromEntries(Object.entries(base).map(([key, text]) => [key, pseudoText(text)]));
   }
   return { ...base, ...own };
+};
+
+/** What stands for a source with no texts among the tables kept: a key of its own, never a source's. */
+const NO_TEXTS: object = {};
+
+/** The tables already read, by the source's texts and then by language, so a language shown again is the same table. */
+const shownTables = new WeakMap<object, Map<string, Promise<StoryTextTable>>>();
+
+/**
+ * The texts of the shown language: the same table, the same object, for as long as the language and the source's
+ * texts stay the same, whatever else of the view changes (a theme, a width), so what a story derives from it (a
+ * text function a memo is keyed on) changes only with the language. A table whose loader failed is read again the
+ * next time it is asked for.
+ *
+ * @param texts - the source's tables or their loaders, by language id; none when the source has none.
+ * @param language - the shown language, when one is chosen; none for the stories' own (English).
+ */
+export const shownTexts = (
+  texts: StorySource["texts"],
+  language: StoryLanguage | undefined
+): Promise<StoryTextTable> => {
+  const holder = texts ?? NO_TEXTS;
+  const byLanguage = shownTables.get(holder) ?? new Map<string, Promise<StoryTextTable>>();
+  shownTables.set(holder, byLanguage);
+  const key = language === undefined ? "" : `${language.id}${language.isPseudo === true ? " pseudo" : ""}`;
+  const known = byLanguage.get(key);
+  if (known !== undefined) return known;
+  const read = readShownTexts(texts, language);
+  byLanguage.set(key, read);
+  read.catch(() => byLanguage.delete(key));
+  return read;
 };
 
 /**
