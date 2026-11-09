@@ -22,7 +22,6 @@ import { actionNames, mappedArgs } from "../storyArgTypes.ts";
 import type { ClockState } from "../storyClock.ts";
 import { withStoryTexts } from "../storyTexts.ts";
 import type { FrameClock } from "./frameClock.ts";
-import { ERROR_MESSAGE_CLASS, ERROR_STACK_CLASS } from "./frameStatus.ts";
 import { matrixLayout } from "./matrixLayout.ts";
 import { type HeldStepper, heldStepper, runPlay } from "./playStepper.ts";
 import type { PlayTools, PlayToolsLoader } from "./playStory.ts";
@@ -35,8 +34,10 @@ import type {
   StoryIdentity
 } from "./renderer.ts";
 import { animationsSettled } from "./settle.ts";
+import { keepStartedImports } from "./startedImports.ts";
 import { storyCanvas } from "./storyCanvas.ts";
 import { contentBeforePlay, contentOf, outcomeOf, type StoryOutcome } from "./storyContent.ts";
+import { errorElement } from "./storyError.ts";
 import { type PreparedStory, prepareStory } from "./storyHooks.ts";
 import type { LoadedArgs, LoadedBeforeEach, LoadedStory } from "./storyModule.ts";
 
@@ -109,29 +110,6 @@ export type StoryRunOptions = {
   readonly onError: (message: string, stack: string | undefined) => void;
   /** Called with the play function's trace after every change. */
   readonly onTrace: (trace: PlayTrace) => void;
-};
-
-/**
- * The error shown in place of a story that threw: its message and its stack.
- *
- * @param document - the frame's document.
- * @param error - the error.
- */
-const errorElement = (document: Document, error: Error): HTMLElement => {
-  const box = document.createElement("div");
-  box.className = "forgebook-frame-error";
-  box.setAttribute("role", "alert");
-  const message = document.createElement("p");
-  message.className = ERROR_MESSAGE_CLASS;
-  message.textContent = error.message;
-  box.append(message);
-  if (error.stack !== undefined) {
-    const stack = document.createElement("pre");
-    stack.className = ERROR_STACK_CLASS;
-    stack.textContent = error.stack;
-    box.append(stack);
-  }
-  return box;
 };
 
 /** What the frame changes in a running story when the shell sends a new view: no new mount, the story keeps its state. */
@@ -405,10 +383,11 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
     nextStepper = undefined;
     const canvas = storyCanvas(document, story);
     container.append(canvas);
+    const imports = keepStartedImports();
     const alone = renderer.mount(canvas, drawing({}), showError);
     mounted = [{ story: alone, values: {} }];
     // a play drives the story, not its fallback; one that shows only the fallback has nothing for it to find
-    void contentBeforePlay(alone, story).then(async (loaded) => {
+    void contentBeforePlay(alone, story, imports).then(async (loaded) => {
       // a later mount (Replay, the matrix) replaced this one before it was drawn: its play would drive a gone story
       if (count !== mountCount) return;
       const isStuck = loaded.state === "waiting" || shownError !== undefined;
@@ -438,7 +417,7 @@ export const runStory = (options: StoryRunOptions): RunningStory => {
         (): void => {
           // what a play did may load something in turn (a tab it opened), which its checks must see too
           if (play === undefined || loaded.state === "unknown") finish(loaded);
-          else void contentOf(alone, story).then(finish);
+          else void contentOf(alone, story, story.suspense.timeout, imports).then(finish);
         },
         options.onTrace,
         tools,

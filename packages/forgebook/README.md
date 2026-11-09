@@ -1389,7 +1389,12 @@ A frame says a story is ready only once what the story loads is in the page, so 
 tests and the compare view read the content and never a fallback. A play function starts after the same wait, and the
 frame waits again after it, for what its clicks load. For React (Next.js and React Native too) and Vue (Nuxt too), that
 is every `Suspense` boundary, whoever wrote it, however deep; in React also a transition or a deferred value still
-loading, which shows no fallback.
+loading, which shows no fallback. On every framework it is also each module the story imports with `import()` while it
+is first drawn (a lazy part loaded from an effect, an editor's modules, a chart's long-series chunk), until it has
+loaded or failed: a module that fails is the story's to show, and the story is ready with what it shows then. What
+starts after the first drawing, from a click or a timer, is not waited for. A story that shows no loading state and
+imports nothing is ready as soon as it is drawn, with no added wait. The catalogue's Vite plugin finds these imports
+by wrapping each `import()` of the code the frames load, Forgebook's own packages left out.
 
 The wait is bounded: 10 s by default. Past it the frame's status is `pending`, with the reason on the page and in
 `data-forgebook-pending-reason`. `check` reports the story `notVerified` and exits non-zero, `verify` answers
@@ -1408,7 +1413,7 @@ that never answered, never as a pass. A story with `expected` is checked as it f
 React and Vue do not say what is pending in public, so the adapters read their private tree. Each page first tries that
 reading on a boundary known to be pending and on one known not to be; on a version of React or Vue where it no longer
 works, every story is `pending` with that reason instead of ready on a guess. A cost of about one tree walk per story,
-in the adapter. A root a story creates itself with `createRoot` is out of reach, and so is what a story loads without
+in the adapter. A root a story creates itself with `createRoot` is out of reach, and so is data a story fetches without
 `Suspense` (a `useEffect` fetch with a spinner): a play function can wait for that with `findBy…`.
 
 The other adapters have no such wait. Angular's `drawn` waits for the application to be stable. Preact's

@@ -201,7 +201,8 @@ The id is not in the catalogue. Ids carry their source's id first: a catalogue's
 
 ### A story that is pending
 
-A frame waits up to 10 s for what a story loads (`Suspense` in React and Vue). Past that the story is `pending`:
+A frame waits up to 10 s for what a story loads (`Suspense` in React and Vue, and the modules a story imports while it
+is first drawn). Past that the story is `pending`:
 `check` reports it not verified and exits 1, and `verify` answers `not-verified`. Mark a loading state with
 `parameters: { suspense: { expected: true } }`, or give a slow story longer with
 `parameters: { suspense: { timeout: 15_000 } }`. See [stories that load](./how-to/writing-stories.md#stories-that-load).
