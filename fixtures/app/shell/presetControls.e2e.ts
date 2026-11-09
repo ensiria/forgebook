@@ -19,6 +19,9 @@ const frameOf = (page: Page): FrameLocator => page.frameLocator("iframe.forgeboo
 /** A prop's icon picker, by the prop's name. */
 const pickerOf = (page: Page, prop: string) => page.getByRole("group", { name: `${prop}: icon` });
 
+/** What a frame loads to turn a control's values: the turning code, the story's docs, the picker's frame module. */
+const FRAME_TURNING = /controlValues|forgebook-docs$|icon-value|iconValue/;
+
 /** The addresses of the picker's modules, in the shell or in a frame. */
 const PICKER_MODULES = /icon-picker|iconPicker|icon-value|iconValue/;
 
@@ -100,6 +103,29 @@ test.describe("a preset's control by type", () => {
     await page.goto(CHIP);
     await expect(pickerOf(page, "startIcon").getByRole("radio")).toHaveCount(7);
     expect(requests.filter((url) => PICKER_MODULES.test(url)).length).toBeGreaterThan(0);
+  });
+
+  test("loads the frame's turning code and its story's docs only once a module may have work", async ({
+    page
+  }) => {
+    const framed: string[] = [];
+    page.on("request", (request) => {
+      if (request.frame() !== page.mainFrame()) framed.push(request.url());
+    });
+    const turning = (): string[] => framed.filter((url) => FRAME_TURNING.test(url));
+    // a story with plain values only, and one whose icons the panel has not set yet
+    for (const address of ["/?story=kit:inputs-selection-select--overview", CHIP]) {
+      await page.goto(address);
+      await expect(frameOf(page).locator('html[data-forgebook-status="ready"]')).toHaveCount(1);
+      // the panel's values reach the frame once its docs are read: give them time to ask for anything
+      await expect(page.getByRole("tab", { name: "Props" })).toBeVisible();
+      await page.waitForTimeout(500);
+    }
+    expect(turning()).toEqual([]);
+    // a pick gives the frame a value: now it loads them
+    await pickerOf(page, "startIcon").getByRole("radio", { name: "IconStar" }).check();
+    await expect(frameOf(page).locator('[data-icon="IconStar"]')).toBeVisible();
+    expect(turning().length).toBeGreaterThan(0);
   });
 
   test("reaches agents as a custom control with its schema, and checks the names they set", async ({

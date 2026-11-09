@@ -833,8 +833,10 @@ export const toPanelValue: ArgControlFrameModule["toPanelValue"] = (icon) =>
   the story file's own code for an arg stays as written until the panel sets it. It runs in the page and on the dev
   server.
 - **When it loads.** The module loads when the panel first shows a prop it takes, the frame module when a story's frame
-  is first given a value of it: neither on the catalogue's first load. A catalogue whose controls have a frame module
-  also reads each story's component docs in its frame, once, to know which props they take.
+  is first given a value of it: neither on the catalogue's first load. A frame reads its story's component docs, to
+  know which props a control takes, only once a module may have work: the panel gives a value, the story's `argTypes`
+  name a control with a frame module, or the story gives itself a value plain data cannot show (an icon to name back).
+  A story of plain values that nobody edits loads neither.
 - **Texts.** A control receives `strings` (always given; optional in the type, so its own tests need not build it): the
   catalogue's `strings` whose key starts with `argControls.<name>.`, by the rest of the key. A preset words its control
   there, and the catalogue's own `strings` replace a preset's.
