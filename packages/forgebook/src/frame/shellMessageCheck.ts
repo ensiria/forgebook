@@ -5,7 +5,7 @@
  * @module
  */
 import { isMatrix } from "../matrix.ts";
-import { isPanelArgs, type ShellMessage } from "../messages.ts";
+import { isJsonValue, isPanelArgs, type ShellMessage } from "../messages.ts";
 import { type ClockState, isClockRate } from "../storyClock.ts";
 import { type LiveView, MEASURE_TOOLS } from "../viewState.ts";
 
@@ -54,5 +54,7 @@ export const isShellMessage = (value: unknown): value is ShellMessage => {
     return Array.isArray(tools) && tools.every((tool) => MEASURE_TOOLS.some((known) => known === tool));
   }
   if (value["type"] === "forgebook:matrix") return value["matrix"] === null || isMatrix(value["matrix"]);
+  if (value["type"] === "forgebook:plugin-message")
+    return typeof value["plugin"] === "string" && isJsonValue(value["value"]);
   return value["type"] === "forgebook:events" && isStringList(value["names"]);
 };

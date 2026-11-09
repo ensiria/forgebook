@@ -25,9 +25,10 @@ export default defineConfig({
     // read right to left, with no texts of its own: it draws the stories right to left, in English
     { id: "ar", label: "العربية", dir: "rtl" }
   ],
-  presets: [kitPreset()],
-  // the two plugins Forgebook ships, and one that touches every place the plugin API offers
-  plugins: [figma(), msw(), probePlugin()],
+  // the probe, a plugin that touches every place the plugin API offers, comes from a preset, as a library's would
+  presets: [kitPreset(), { name: "probe", plugins: [probePlugin()] }],
+  // the two plugins Forgebook ships
+  plugins: [figma(), msw()],
   // lists of its own, so the shell's tests see each set by a catalogue
   id: "fixture",
   widths: [{ width: 360 }, { width: 412, label: "Phone L" }, { width: 560 }, { width: 768 }, { width: 1024 }],
