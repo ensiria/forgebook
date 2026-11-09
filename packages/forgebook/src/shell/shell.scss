@@ -642,6 +642,12 @@
     flex: 1;
     min-height: 0;
     overflow: auto;
+
+    // a field the focus reaches scrolls into view above the Props tab's sticky bar, not under it: the bar's height
+    // (two paddings and a control's line) and room for the focus ring
+    &:has(.forgebook-tab-foot) {
+      scroll-padding-block-end: 2.5rem;
+    }
   }
 
   .forgebook-icon-button {
