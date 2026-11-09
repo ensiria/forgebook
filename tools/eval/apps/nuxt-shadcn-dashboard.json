@@ -7,6 +7,7 @@
   "install": ["pnpm", "install", "--frozen-lockfile", "--ignore-scripts"],
   "prepare": [["pnpm", "exec", "nuxt", "prepare"]],
   "dev": ["pnpm", "exec", "nuxt", "dev", "--port", "{port}", "--host", "localhost"],
+  "basePath": "/nuxt-shadcn-dashboard",
   "readyPath": "/",
   "checks": {
     "typecheck": ["pnpm", "exec", "vue-tsc", "--noEmit"],

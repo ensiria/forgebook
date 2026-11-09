@@ -17,6 +17,7 @@ import { isOwnGroup, killTree, STOP_TIMEOUT, waitForExit } from "../bench/proces
 import { invocation } from "../bench/programs.ts";
 import { toolEnvironment } from "../bench/toolEnvironment.ts";
 import type { AgentProfile } from "./eval.types.ts";
+import { withOpenFiles } from "./openFiles.ts";
 
 /** What an agent's run gave. */
 export type AgentResult = {
@@ -75,7 +76,8 @@ export const runAgent = async (request: AgentRequest): Promise<AgentResult> => {
   const [program, ...args] = request.command;
   if (program === undefined) throw new Error("the agent's command is empty");
   const env = agentEnvironment(request.profile, request.env, request.shared);
-  const resolved = invocation(program, args, { cwd: request.workspace, env });
+  // the agent starts the app's dev server itself, which needs the same room
+  const resolved = withOpenFiles(invocation(program, args, { cwd: request.workspace, env }));
   const stdout = createWriteStream(request.stdoutFile);
   const stderr = createWriteStream(request.stderrFile);
   const startedAt = Date.now();
