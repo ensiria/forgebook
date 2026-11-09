@@ -27,8 +27,12 @@ The framework's own guide (`forgebook guide <framework>`) has what differs in yo
   value over the story's own; an empty text is `""`; a `Date` is `{ "forgebookDate": "<ISO>" }`. Give a person the `address` link to look at them: `forgebook shot` draws
   a frame alone, with the story's own values.
 - A custom control (`control: "custom"`, `custom` its name) takes a value that fits `schema`, in `controls`; set it as any
-  other. A new one is a module exporting `mount(el, { value, onChange, argType })`, returning an unmount, and `schema`,
-  registered in `argControls` of `forgebook.config`; keep what touches the page inside `mount`, so the commands can read it.
+  other. A new one is a module exporting `mount(el, { value, onChange, argType, strings })`, returning an unmount, and
+  `schema`, registered in `argControls` of `forgebook.config` or of a library's preset; keep what touches the page inside
+  `mount`, so the commands can read it. Registered as `{ module, frame, matches: { typeName: "IconComponent" } }`, it takes
+  every prop of that type (or `propName`) in stories whose `argTypes` name no control for it, with no story code: a prop's
+  `typeNames` say the aliases its type goes through. The value stays JSON (an icon's name); the `frame` module's
+  `toStoryValue(value, argType)` turns it into what the story receives.
 - A prop's TSDoc can ask for design tokens (`@token color`, a token's type or a part of its name), a story's arg with
   `argTypes: { x: { control: { type: "token", of: "space", format: "var(--{name})" } } }`.
 - Story ids are Storybook's (`inputs-readmore--open-by-default`, prefixed by the source's id); the commands also take

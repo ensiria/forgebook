@@ -35,6 +35,42 @@ export type ForgebookPreset = CatalogueLists & {
   readonly head?: string;
   /** The shell's look, under the catalogue's: its theme, and a style sheet by absolute path. */
   readonly shell?: ShellOptions;
+  /**
+   * Custom controls of the props panel it brings to every catalogue that lists it, by name, each module by absolute path
+   * or a package's specifier: a catalogue's registration of the same name replaces it. They run in the catalogue's page
+   * with a plugin's trust, as the catalogue's own do.
+   */
+  readonly argControls?: Readonly<Record<string, string | ArgControlOption>>;
+};
+
+/**
+ * Which props a custom control takes without a story naming it: each field given must hold, so `{ typeName, propName }`
+ * takes only that prop of that type.
+ */
+export type ArgControlMatch = {
+  /**
+   * The type's name as the props are read: as the source writes it (`IconComponent`), or any alias it is declared
+   * through (`type ButtonIcon = IconComponent`), without `undefined` and `null`; a union only when every member goes by it.
+   */
+  readonly typeName?: string;
+  /** The prop's name (`icon`). */
+  readonly propName?: string;
+};
+
+/** A custom control with more than its module: its frame module, and the props it takes on its own. */
+export type ArgControlOption = {
+  /** The module the panel draws it with, exporting `mount` and `schema`. */
+  readonly module: string;
+  /**
+   * A module of the stories' frames exporting `toStoryValue(value, argType)`, which turns the panel's JSON value into
+   * what the story receives (a name into an icon); none gives the story the JSON value.
+   */
+  readonly frame?: string;
+  /**
+   * The props it is the control of in every story that names no control for them, by type or by name; one or a list,
+   * of which any may match. A match by name wins over one by type, then the catalogue's controls over its presets'.
+   */
+  readonly matches?: ArgControlMatch | readonly ArgControlMatch[];
 };
 
 /** A tokens file: its path from the configuration's folder, with its theme when it is a theme's. */
@@ -87,10 +123,11 @@ export type ForgebookConfig = CatalogueLists & {
   readonly tokens?: readonly TokensFile[];
   /**
    * Custom controls of the props panel, by the name a story's `argTypes` use (`{ rating: "./controls/rating.ts" }`): each a
-   * module, by path from the configuration's folder or a package's specifier, exporting `mount` and `schema`. It loads when
-   * a story names it, and runs in the shell's page with a plugin's trust.
+   * module, by path from the configuration's folder or a package's specifier, exporting `mount` and `schema`, or an
+   * `ArgControlOption` with a frame module and the props it matches. It loads when a story's panel shows it, and runs in
+   * the shell's page with a plugin's trust. A name its presets register is replaced; `false` removes theirs.
    */
-  readonly argControls?: Readonly<Record<string, string>>;
+  readonly argControls?: Readonly<Record<string, string | ArgControlOption | false>>;
   /** Its preview's path from the configuration's folder; `forgebook.preview.ts` (or `.tsx`) beside it when there. */
   readonly preview?: string;
   /** Tags for every frame's `<head>` (a font's link); none by default. */

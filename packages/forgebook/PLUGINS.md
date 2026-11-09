@@ -152,8 +152,11 @@ speaks and refuses any other by name.
 ## A control, not a plugin
 
 A panel control is not part of this contract: it is a module a catalogue registers in `argControls`, with a plugin's trust
-and a contract of its own (`mount` and `schema`, in the README's "Controls of your own"). A plugin cannot add one: a control
-belongs to the catalogue whose stories name it.
+and a contract of its own (`mount` and `schema`, in the README's "Controls of your own"). A library's preset can register
+one too, with a frame module (`toStoryValue`) and the props it takes by type or name (`matches`), so its own types get
+their control in every catalogue that lists the preset (the README's "Controls by type, and from a library's preset"). A
+plugin cannot add one: the catalogue and its presets declare what its stories' props are, and the catalogue's
+registration of a name replaces a preset's, or removes it with `false`.
 
 ## What it leaves out, on purpose
 

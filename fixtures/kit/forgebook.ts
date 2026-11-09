@@ -1,7 +1,8 @@
 /**
  * The fixture kit's preset for Forgebook, as a library ships one (its `./forgebook` export): the theme and the
- * contrast, the kit's motion, speed and press feedback, and its story groups, with their values and names, so a
- * catalogue that shows the kit gets its View menu and its groups with `presets: [kitPreset()]`.
+ * contrast, the kit's motion, speed and press feedback, its story groups, with their values and names, and its icon
+ * picker for every prop typed `IconComponent`, so a catalogue that shows the kit gets its View menu, its groups and its
+ * picker with `presets: [kitPreset()]`.
  *
  * @module
  */
@@ -70,5 +71,15 @@ export const kitPreset = (): ForgebookPreset =>
       { id: "showcase", label: "Showcase" },
       { id: "worst-case", label: "Worst cases" },
       { id: "behaviour", label: "Behaviour" }
-    ]
+    ],
+    // every prop typed with the kit's icons, in every story that names no control for it
+    argControls: {
+      icon: {
+        module: "@fixture/kit/forgebook/icon-picker",
+        frame: "@fixture/kit/forgebook/icon-value",
+        matches: { typeName: "IconComponent" }
+      }
+    },
+    // the picker's words, as the kit puts them; a catalogue's own `strings` replace them
+    strings: { "argControls.icon.none": "No icon" }
   });

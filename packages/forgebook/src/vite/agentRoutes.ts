@@ -22,6 +22,7 @@ import { createIdResolver, type ViteDevServer } from "vite";
 
 import type { ValueSchema } from "../argControl.ts";
 import { offersUsedIn, readsComponentDocs } from "../catalogue.ts";
+import { isComponentDocs } from "../componentDocs.ts";
 import type { StoryCodeWriter } from "../frame/renderer.ts";
 import { type LoadedPreview, mergedPreviews, NO_PREVIEW, readPreview } from "../frame/storyModule.ts";
 import type { FramesPlacement, PageOrigins } from "../frameOrigins.ts";
@@ -271,16 +272,21 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
   // the story's own file: its module, and the docs of the component its meta names, which its args are for
   const file = location.story.file;
   const storyModule = await settled(files.stories[file]);
+  const docs = await settled(files.docs[file]);
   const parts: LoadedStoryParts = {
     module: storyModule,
-    docs: await settled(files.docs[file]),
+    docs,
     preview: loaded.preview,
     namedValues: source.namedValues,
     setArgs: params.get("args") ?? undefined,
     customControls:
       context.server === undefined
         ? undefined
-        : await customControlsRead(customControlNames(storyModule, location), config, context.server),
+        : await customControlsRead(
+            [...customControlNames(storyModule, location), ...typedControlNames(docs)],
+            config,
+            context.server
+          ),
     addressTexts: config.framework.addressTexts
   };
   const code: AgentCodeParts | undefined =
@@ -337,6 +343,19 @@ const codeWriterOf = async (
   }
 };
 
+/**
+ * The controls the catalogue gives a story's props by type or name, as its component's docs say: their modules load for
+ * the story's document too.
+ *
+ * @param docs - the docs, as the dev server loaded them.
+ */
+const typedControlNames = (
+  docs: { readonly value: unknown } | { readonly error: string }
+): readonly string[] =>
+  "value" in docs && isComponentDocs(docs.value)
+    ? docs.value.props.flatMap((prop) => prop.customControl ?? [])
+    : [];
+
 /** How long a control's module may take to load for an answer: one that hangs must not hold every answer with it. */
 const CONTROL_LOAD_MS = 5000;
 
@@ -370,9 +389,12 @@ const customControlsRead = async (
   config: ResolvedConfig,
   server: AgentServer
 ): Promise<CustomControlsRead> => {
-  const known = names.filter((name) => Object.hasOwn(config.argControls, name));
+  const known = names.flatMap((name) => {
+    const control = Object.hasOwn(config.argControls, name) ? config.argControls[name] : undefined;
+    return control === undefined ? [] : [[name, control.module] as const];
+  });
   const read = await Promise.all(
-    known.map(async (name) => [name, await controlSchemaOf(config.argControls[name] ?? "", server)] as const)
+    known.map(async ([name, module]) => [name, await controlSchemaOf(module, server)] as const)
   );
   return {
     schemas: Object.fromEntries(

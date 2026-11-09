@@ -215,9 +215,11 @@ const withArgType = (prop: PropDocs, argType: PanelArgType, own: ArgValue | unde
   const { control } = argType;
   // a control the panel cannot draw makes the prop one it lists for reading, never one that takes a text
   const isReadOnly = control === "none";
-  const { canTakeText: _canTakeText, ...rest } = prop;
+  // a control the story names wins over the one the catalogue gives the prop's type
+  const { customControl: _typed, ...untyped } = prop;
+  const { canTakeText: _canTakeText, ...rest } = untyped;
   // a control the story names decides what its value is: the type's shape no longer draws nor checks it
-  const { shape: _shape, ...shapeless } = isReadOnly || argType.customControl !== undefined ? rest : prop;
+  const { shape: _shape, ...shapeless } = isReadOnly || argType.customControl !== undefined ? rest : untyped;
   return {
     ...(control === undefined && argType.customControl === undefined ? prop : shapeless),
     ...(control === undefined ? {} : { kind: KIND_OF_CONTROL[control], control }),

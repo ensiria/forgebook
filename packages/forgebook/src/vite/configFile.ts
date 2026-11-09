@@ -30,11 +30,11 @@ import {
   shellThemeProblems,
   themeValueProblem
 } from "../shellTheme.ts";
-import { CONTROLS } from "../storyArgTypes.ts";
 import { mergedStatuses, statusesProblem } from "../storyStatuses.ts";
 import { catalogueSwitches, switchesProblem, type ViewSwitch } from "../switches.ts";
 import type { FrameworkAdapter } from "./adapter.ts";
 import { appBuildProblem, type ResolvedAppBuild, resolvedAppBuild } from "./appBuildOption.ts";
+import { type ResolvedArgControls, resolvedArgControls } from "./argControlsConfig.ts";
 import type { BuildOptions, ForgebookConfig } from "./config.ts";
 import { saysNoTokens, unknownKeysProblem } from "./configKeys.ts";
 import { configLoadMessage } from "./configLoadError.ts";
@@ -118,8 +118,8 @@ export type ResolvedConfig = {
   readonly tokens: readonly ResolvedTokensFile[];
   /** Whether the configuration says `tokens: []`: no system at all, so the application's own files are not read for one. */
   readonly isAppTokensOff?: boolean;
-  /** The custom controls' modules by name: a path absolute, a package's specifier as written. */
-  readonly argControls: Readonly<Record<string, string>>;
+  /** The custom controls by name, the catalogue's and its presets', in their precedence. */
+  readonly argControls: ResolvedArgControls;
   /** The folders the dev server watches for new story files, absolute. */
   readonly watch: readonly string[];
   /** The lists (widths, backgrounds, story groups…), the presets' and the catalogue's merged. */
@@ -570,7 +570,11 @@ export const resolveConfig = (
     },
     tokens,
     isAppTokensOff: saysNoTokens(config),
-    argControls: resolvedArgControls(config.argControls, dir, absolute, paths.isAbsolute),
+    argControls: resolvedArgControls(config, dir, {
+      absolute,
+      isAbsolute: paths.isAbsolute,
+      normalize: paths.normalize
+    }),
     watch: (config.watch ?? []).map(absolute),
     lists,
     hasPlayTools: hasPlayToolsIn(dir),
@@ -581,34 +585,6 @@ export const resolveConfig = (
     appBuild: resolvedAppBuild(config.appBuild)
   };
 };
-
-/**
- * The custom controls' modules, each checked: a name a story can write, that no control of the panel already has.
- *
- * @param controls - what the configuration writes.
- * @param dir - the configuration's folder.
- * @param absolute - a path from that folder, made absolute.
- * @param isAbsolutePath - whether a path is one already.
- * @throws when a name or a module cannot be used.
- */
-const resolvedArgControls = (
-  controls: Readonly<Record<string, unknown>> | undefined,
-  dir: string,
-  absolute: (path: string) => string,
-  isAbsolutePath: (path: string) => boolean
-): Readonly<Record<string, string>> =>
-  Object.fromEntries(
-    Object.entries(controls ?? {}).map(([name, module]): [string, string] => {
-      const where = `${resolve(dir, "forgebook.config")}: argControls`;
-      if (Object.hasOwn(CONTROLS, name))
-        throw new Error(`${where}: "${name}" is a control of the panel already`);
-      if (!/^[A-Za-z][\w-]*$/.test(name))
-        throw new Error(`${where}: "${name}" is no name a control can have`);
-      if (typeof module !== "string" || module === "")
-        throw new Error(`${where}: "${name}" names no module, as a path or a package's specifier`);
-      return [name, module.startsWith(".") || isAbsolutePath(module) ? absolute(module) : module];
-    })
-  );
 
 /**
  * Loads a configuration file and resolves it.

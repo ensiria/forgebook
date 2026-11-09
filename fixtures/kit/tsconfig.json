@@ -8,5 +8,5 @@
     // its preset (`forgebook.ts`) reads Forgebook's configuration types, whose modules carry `.ts` (Node loads them)
     "allowImportingTsExtensions": true
   },
-  "include": ["src", "stories.ts", "forgebook.ts"]
+  "include": ["src", "stories.ts", "forgebook.ts", "forgebook"]
 }

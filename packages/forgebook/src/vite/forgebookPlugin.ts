@@ -80,6 +80,7 @@ import { scriptProblems } from "./scriptProblems.ts";
 import { type IndexedStoryFile, isKeptIndex, type KeptIndex } from "./storyFilesModule.ts";
 import { tokensModule } from "./storylessRoutes.ts";
 import { DOCS_QUERY, RENEWED_QUERIES, TEXT_QUERIES } from "./textQueries.ts";
+import { withTypedControls } from "./typedControls.ts";
 import { VITE_PATHS } from "./vitePaths.ts";
 
 /** This module's folder, in the core's package: the core's own dependencies resolve from here, not the project's. */
@@ -183,7 +184,9 @@ export const forgebookPlugin = (options: ForgebookPluginOptions = {}): Plugin =>
   const isServing = (): boolean => command === "serve";
   // the search's indexes, a build reading each component's docs once for its page and its index
   const search = searchIndexes({
-    extract: (storyFile: string) => extractor().extract(storyFile),
+    // the catalogue's controls by type are written into the docs here, so every reader of them sees the same panel
+    extract: async (storyFile: string) =>
+      withTypedControls(await extractor().extract(storyFile), config?.argControls ?? {}),
     isServing,
     track: (id: string, isPages: boolean) => (isPages ? docsModules : searchModules).add(id),
     isKept: access.isKept

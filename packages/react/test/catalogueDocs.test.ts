@@ -26,8 +26,13 @@ describe("collectDocs and catalogueMarkdown", () => {
       ["Inputs/Selection/Select", "./select"],
       ["Hooks/useUndo", "./use-undo"]
     ]);
-    // the kit's preset is one of its modules too, as a library's `./forgebook` is
-    expect(data.modules.map((module) => module.subpath)).toEqual(["./utils/format-size", "./forgebook"]);
+    // the kit's preset and its icon picker's modules are modules too, as a library's `./forgebook` exports are
+    expect(data.modules.map((module) => module.subpath)).toEqual([
+      "./utils/format-size",
+      "./forgebook",
+      "./forgebook/icon-picker",
+      "./forgebook/icon-value"
+    ]);
     expect(data.sassModules.map((module) => module.subpath)).toEqual(["./scss/ring"]);
     expect(data.styleSheets).toEqual([{ subpath: "./kit.css", summary: "The fixture kit's style sheet." }]);
   });
@@ -100,7 +105,11 @@ describe("collectDocs and catalogueMarkdown", () => {
   it("leaves out the excluded subpaths and writes the sections asked for, in their order", () => {
     const excluded = collectDocs(KIT, extractStoryComponent, { exclude: ["./utils/*", "./select"] }).data;
     expect(excluded.components.map((component) => component.subpath)).toEqual(["./use-undo"]);
-    expect(excluded.modules.map((module) => module.subpath)).toEqual(["./forgebook"]);
+    expect(excluded.modules.map((module) => module.subpath)).toEqual([
+      "./forgebook",
+      "./forgebook/icon-picker",
+      "./forgebook/icon-value"
+    ]);
     const headings = catalogueMarkdown(data, ["styleSheets", "components"])
       .split("\n")
       .filter((line) => line.startsWith("## "));

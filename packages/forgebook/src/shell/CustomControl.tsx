@@ -8,14 +8,16 @@
  *
  * @module
  */
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ArgControlModule, ControlArgType } from "../argControl.ts";
 import type { PanelProp } from "../argTypes.ts";
 import { type ArgValue, isArgValue, UNSET_ARG } from "../messages.ts";
+import { useCatalogue } from "./catalogueContext.ts";
 import {
   type ArgControlLoaders,
   CONTROL_STRINGS,
+  controlStringsOf,
   controlValueProblem,
   loadControl
 } from "./customControls.ts";
@@ -61,6 +63,8 @@ type ControlRoomProps = {
   readonly value: ArgValue | undefined;
   /** What the story says of the arg. */
   readonly argType: ControlArgType;
+  /** Its texts as the catalogue words them. */
+  readonly strings: Readonly<Record<string, string>>;
   /** Takes a value it gave, once it passed. */
   readonly onAccepted: (value: ArgValue | undefined) => void;
   /** Says what went wrong; none takes it back. */
@@ -88,16 +92,17 @@ const ControlRoom = ({
   name,
   value,
   argType,
+  strings,
   onAccepted,
   onProblem
 }: ControlRoomProps): ReactNode => {
   const element = useRef<HTMLDivElement>(null);
-  const start = useRef({ value, argType, onAccepted, onProblem });
-  start.current = { value, argType, onAccepted, onProblem };
+  const start = useRef({ value, argType, strings, onAccepted, onProblem });
+  start.current = { value, argType, strings, onAccepted, onProblem };
   useEffect(() => {
     const host = element.current;
     if (host === null) return;
-    const { value: shown, argType: told, onProblem: say } = start.current;
+    const { value: shown, argType: told, strings: words, onProblem: say } = start.current;
     const refusal = shown === undefined ? undefined : controlValueProblem(module, shown);
     say(refusal === undefined ? undefined : CONTROL_STRINGS.controlValue(name, refusal));
     let isMounted = true;
@@ -116,7 +121,8 @@ const ControlRoom = ({
             start.current.onAccepted(change.value);
           }
         },
-        argType: told
+        argType: told,
+        strings: words
       });
     } catch (error) {
       say(CONTROL_STRINGS.controlThrew(name, error instanceof Error ? error.message : String(error)));
@@ -153,6 +159,8 @@ const MountedControl = ({
     setMounts(mounts + 1);
   }
   const argType = argTypeOf(prop);
+  const { strings: catalogueStrings } = useCatalogue();
+  const strings = useMemo(() => controlStringsOf(catalogueStrings, name), [catalogueStrings, name]);
   return (
     <>
       <ControlRoom
@@ -161,6 +169,7 @@ const MountedControl = ({
         name={name}
         value={value}
         argType={argType}
+        strings={strings}
         onProblem={setProblem}
         onAccepted={(next: ArgValue | undefined): void => {
           given.current = textOf(next);
