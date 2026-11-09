@@ -110,9 +110,16 @@ export const appProblems = (value: unknown, name: string): string[] => {
     ...APP_RULES.flatMap(([field, isValid, message]) =>
       isValid(value[field]) ? [] : [`${name}: "${field}" ${message}`]
     ),
-    ...checksProblems(value["checks"], name)
+    ...checksProblems(value["checks"], name),
+    ...(isBasePath(value["basePath"])
+      ? []
+      : [`${name}: "basePath" must start with / and not end with it (\`/dashboard\`), or be left out`])
   ];
 };
+
+/** Whether a value is an app's base path, or left out. */
+const isBasePath = (value: unknown): boolean =>
+  value === undefined || (typeof value === "string" && value.startsWith("/") && !value.endsWith("/"));
 
 /**
  * Reads an app's definition.
@@ -142,6 +149,7 @@ export const parseApp = (text: string, name: string): EvalApp => {
     install: isCommand(value["install"]) ? value["install"] : [],
     prepare: Array.isArray(value["prepare"]) ? value["prepare"].filter(isCommand) : [],
     dev: isCommand(value["dev"]) ? value["dev"] : [],
+    basePath: typeof value["basePath"] === "string" ? value["basePath"] : "",
     readyPath: String(value["readyPath"]),
     checks: {
       ...(typecheck === undefined ? {} : { typecheck }),

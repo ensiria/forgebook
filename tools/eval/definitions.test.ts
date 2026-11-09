@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { appProblems, filledCommand, parseProfile, parseTask, stepOf } from "./definitions.ts";
+import { appProblems, filledCommand, parseApp, parseProfile, parseTask, stepOf } from "./definitions.ts";
 import { EVAL_FOLDER, readDefinitions } from "./runEval.ts";
 
 const APP = {
@@ -58,6 +58,18 @@ describe("an app's definition", () => {
     expect(problems.join("\n")).toMatch(/repository/);
     expect(problems.join("\n")).toMatch(/\{port\}/);
     expect(problems.join("\n")).toMatch(/unknown check "deploy"/);
+  });
+});
+
+describe("an app served under a base path", () => {
+  it("reads the path its pages are under, none by default", () => {
+    expect(parseApp(JSON.stringify(APP), "app").basePath).toBe("");
+    expect(parseApp(JSON.stringify({ ...APP, basePath: "/dashboard" }), "app").basePath).toBe("/dashboard");
+  });
+
+  it("refuses one that does not start with / or ends with it", () => {
+    expect(appProblems({ ...APP, basePath: "dashboard" }, "app").join("\n")).toMatch(/basePath/);
+    expect(appProblems({ ...APP, basePath: "/dashboard/" }, "app").join("\n")).toMatch(/basePath/);
   });
 });
 

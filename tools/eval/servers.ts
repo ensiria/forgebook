@@ -9,6 +9,7 @@ import { connect } from "node:net";
 
 import { hasEnded, isOwnGroup, killTree, STOP_TIMEOUT, waitForExit } from "../bench/processTree.ts";
 import { invocation } from "../bench/programs.ts";
+import { withOpenFiles } from "./openFiles.ts";
 
 /** How long a server may take to answer, in milliseconds: a first start pre-bundles its dependencies. */
 const START_TIMEOUT = 180_000;
@@ -56,7 +57,7 @@ export const startServer = (
 ): Server => {
   const [program, ...args] = command;
   if (program === undefined) throw new Error("the server's command is empty");
-  const resolved = invocation(program, args, { cwd, env });
+  const resolved = withOpenFiles(invocation(program, args, { cwd, env }));
   const child = spawn(resolved.program, [...resolved.args], {
     cwd,
     env,

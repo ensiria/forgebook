@@ -75,7 +75,12 @@ export const NUXT_CONFIG_FILES = [
 ] as const;
 
 /** The names `app.config` may have. */
-const APP_CONFIG_FILES = ["app.config.ts", "app.config.mts", "app.config.js", "app.config.mjs"] as const;
+export const APP_CONFIG_FILES = [
+  "app.config.ts",
+  "app.config.mts",
+  "app.config.js",
+  "app.config.mjs"
+] as const;
 
 /** The global function a `nuxt.config` calls without importing it. */
 const DEFINE_CONFIG = "defineNuxtConfig";

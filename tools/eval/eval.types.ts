@@ -29,7 +29,12 @@ export type EvalApp = {
   readonly prepare: readonly Command[];
   /** Its dev server, listening on `{port}`. */
   readonly dev: Command;
-  /** A path that answers only once the dev server can draw a page. */
+  /**
+   * The path its pages are served under (`/dashboard`, as Nuxt's `app.baseURL` or Vite's `base` sets it), which every
+   * `goto` and the ready path are read from; empty when it is served at the root.
+   */
+  readonly basePath: string;
+  /** A path, under the base path, that answers only once the dev server can draw a page. */
   readonly readyPath: string;
   /** Its own checks, each run after the change: absent when the app has none of that kind. */
   readonly checks: {
