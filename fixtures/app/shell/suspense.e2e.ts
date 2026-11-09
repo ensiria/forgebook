@@ -80,8 +80,53 @@ export const LoadingState = {
 };
 `;
 
+/**
+ * A part a story imports once it is drawn, with no `Suspense` around it: a placeholder that passes every check until the
+ * module comes, and the part, or what the story shows when the module fails, each with a contrast defect a check finds
+ * only once the frame waited.
+ */
+const LATE = `import { type ComponentType, useEffect, useState } from "react";
+
+export const Late = ({ load }: { readonly load: () => Promise<{ readonly Part: ComponentType }> }) => {
+  const [part, setPart] = useState<{ readonly Part: ComponentType } | "failed">();
+  useEffect(() => {
+    load().then((loaded) => setPart(loaded), () => setPart("failed"));
+  }, [load]);
+  if (part === undefined) return <p style={{ color: "#1c1b1b", background: "#ffffff" }}>Loading the chart</p>;
+  if (part === "failed") return <p style={{ color: "#f4f4f4", background: "#ffffff" }}>The chart could not load</p>;
+  return <part.Part />;
+};
+`;
+
+/** The part, a module that takes a while, as a chart's long-series chunk does. */
+const FAINT_PART = `await new Promise((resolve) => setTimeout(resolve, 400));
+
+export const Part = () => <p style={{ color: "#f4f4f4", background: "#ffffff" }}>Two thousand invented points</p>;
+`;
+
+/** A module that fails once it is loading. */
+const BROKEN_PART = `await new Promise((resolve) => setTimeout(resolve, 1500));
+
+throw new Error("The invented chunk failed");
+`;
+
+const LATE_STORIES = `import { Late } from "./Late";
+
+const faint = () => import("./FaintPart");
+const broken = () => import("./BrokenPart") as Promise<{ readonly Part: () => null }>;
+
+export default { title: "Data/Late", component: Late };
+
+export const LoadedOnDraw = { args: { load: faint } };
+export const FailedChunk = { args: { load: broken } };
+export const Plain = { render: () => <p style={{ color: "#1c1b1b", background: "#ffffff" }}>Nothing to load</p> };
+`;
+
 /** A story's id in this catalogue. */
 const storyId = (name: string): string => `stories:data-table--${name}`;
+
+/** A story's id among those that import a part once drawn. */
+const lateId = (name: string): string => `stories:data-late--${name}`;
 
 /** The parts of a check's answer these tests read. */
 type CheckAnswer = {
@@ -132,8 +177,11 @@ test.describe("a story still loading", () => {
     spawnSync(process.execPath, [ENTRY, ...args], { cwd: dir, encoding: "utf8", timeout: 110_000 });
 
   /** Checks a story, as an agent does. */
-  const check = (name: string): { readonly exit: number | null; readonly answer: CheckAnswer } => {
-    const run = forgebook("check", storyId(name), "--json", "--url", "http://127.0.0.1:9");
+  const check = (
+    name: string,
+    id: string = storyId(name)
+  ): { readonly exit: number | null; readonly answer: CheckAnswer } => {
+    const run = forgebook("check", id, "--json", "--url", "http://127.0.0.1:9");
     return { exit: run.status, answer: JSON.parse(String(run.stdout)) };
   };
 
@@ -159,6 +207,10 @@ test.describe("a story still loading", () => {
     );
     writeFileSync(join(dir, "src", "Table.tsx"), TABLE);
     writeFileSync(join(dir, "src", "Table.stories.tsx"), STORIES);
+    writeFileSync(join(dir, "src", "Late.tsx"), LATE);
+    writeFileSync(join(dir, "src", "FaintPart.tsx"), FAINT_PART);
+    writeFileSync(join(dir, "src", "BrokenPart.tsx"), BROKEN_PART);
+    writeFileSync(join(dir, "src", "Late.stories.tsx"), LATE_STORIES);
   });
 
   test.afterAll(() => {
@@ -173,6 +225,30 @@ test.describe("a story still loading", () => {
       expect(exit).not.toBe(0);
     });
   }
+
+  test("check reads a part the story imported while first drawn, with no Suspense around it", () => {
+    test.setTimeout(120_000);
+    const { exit, answer } = check("", lateId("loaded-on-draw"));
+    expect(answer.results[0]?.notVerified).toBeUndefined();
+    expect(answer.results[0]?.problems.map((each) => each.rule)).toContain("color-contrast");
+    expect(exit).not.toBe(0);
+  });
+
+  test("check reads what a story shows once a module it imported failed, ready and not pending", () => {
+    test.setTimeout(120_000);
+    const { exit, answer } = check("", lateId("failed-chunk"));
+    expect(answer.results[0]?.notVerified).toBeUndefined();
+    expect(answer.results[0]?.problems.map((each) => each.rule)).toContain("color-contrast");
+    expect(exit).not.toBe(0);
+  });
+
+  test("a story with no Suspense and nothing to import is ready and passes", () => {
+    test.setTimeout(120_000);
+    const { exit, answer } = check("", lateId("plain"));
+    expect(answer.results[0]).toMatchObject({ problems: [] });
+    expect(answer.results[0]?.notVerified).toBeUndefined();
+    expect(exit).toBe(0);
+  });
 
   test("a play finds the content, and a story with nothing wrong passes", () => {
     test.setTimeout(120_000);
