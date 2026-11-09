@@ -110,6 +110,17 @@ export type ArgControlModule = {
   readonly mount: (element: HTMLElement, props: ArgControlProps) => () => void;
   /** What its value looks like: a link's value and each `onChange` are checked against it. */
   readonly schema: ValueSchema;
+  /**
+   * The code a value is written as in the story's code (the Code tab, `forgebook story`), when it is not the value as
+   * JSON: the expression the attribute holds, `IconStar` for the icon the name `"IconStar"` gives the story (written
+   * `icon={IconStar}`). None, or `undefined` for a value, writes the JSON value. Runs in the page and on the dev server,
+   * so it reads nothing of either.
+   *
+   * @param value - the panel's value.
+   * @param argType - what the story says of the arg.
+   * @returns the expression, as code.
+   */
+  readonly toCode?: (value: JsonValue, argType: ControlArgType) => string | undefined;
 };
 
 /** What a frame module is told of the arg whose value it turns into the story's. */

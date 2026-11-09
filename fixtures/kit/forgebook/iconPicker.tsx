@@ -1,11 +1,11 @@
 /**
  * The kit's icon picker, as a library ships a control with its preset: every icon of the kit drawn with its name, and
  * "None", as radio buttons, so the arrow keys move between them and each has its name. Its value is the icon's name; the
- * frame module (`iconValue.ts`) turns it into the icon.
+ * frame module (`iconValue.ts`) turns it into the icon, and the story's code writes the icon (`toCode`).
  *
  * @module
  */
-import type { ArgControlProps, ValueSchema } from "forgebook/arg-control";
+import type { ArgControlModule, ArgControlProps, ValueSchema } from "forgebook/arg-control";
 import { type ReactNode, useId, useState } from "react";
 import { createRoot } from "react-dom/client";
 
@@ -13,6 +13,14 @@ import { ICONS } from "../src/icons";
 
 /** What its value looks like: the name of one of the kit's icons. */
 export const schema: ValueSchema = { type: "string", enum: Object.keys(ICONS) };
+
+/**
+ * The code an icon's name is written as: the icon itself, as the kit exports it (`icon={IconStar}`).
+ *
+ * @param value - the panel's value: an icon's name.
+ */
+export const toCode: NonNullable<ArgControlModule["toCode"]> = (value) =>
+  typeof value === "string" && Object.hasOwn(ICONS, value) ? value : undefined;
 
 /** One choice: its picture, if any, and its name. */
 const Choice = ({
