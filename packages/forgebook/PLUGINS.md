@@ -10,6 +10,18 @@ import { figma } from "@forgebook/plugin-figma";
 export default defineConfig({ /* … */ plugins: [figma()] });
 ```
 
+A library's preset can bring plugins too, so every catalogue that lists the preset has them with no line of its own:
+
+```ts
+// the library's preset
+export const acmePreset = (): ForgebookPreset => ({ name: "acme-ui", plugins: [acme()] });
+```
+
+The presets' plugins come first, in the order of `presets`, then the catalogue's. A plugin the catalogue lists with a
+preset's id replaces it; `presetPlugins: { acme: false }` leaves it out, and naming an id no preset brings stops the
+catalogue, so a typo is not silent. A plugin's modules are specifiers the catalogue's folder resolves: a preset names them
+by absolute path, or by a package the catalogue installs.
+
 ## The declaration
 
 A plugin is plain data, read on Node. Everything that runs in a page is a module it names, as a specifier the catalogue's
@@ -96,11 +108,12 @@ A tab is also told:
 | `story` | `id`, `name`, `title`, `componentName`, and `design`: `{ figma? }`, a checked `FigmaLink` of `@forgebook/story-format/source`. |
 | `report` | The last value the plugin's frame module reported for this story; none before that, and none in the compare view, where no frame is the story's. |
 | `showStory(target, { title })` | Draws the story again in an element, as the stage has it now; `{ remove }` takes it away. |
+| `send(value)` | Sends JSON to the plugin's frame module in the stage's frame, whose `receive` gets it. Nothing is sent in the compare view, where no frame is the story's, nor before the frame loaded. Optional in the type: an older Forgebook does not give it. |
 
 A docs block is also told `argument` (what the fence's line says after its name), `body` (the text inside the fence) and
 `showStory(target, { title, storyId })`, which draws any story in the page's view and throws for one the catalogue lacks.
 
-`text` and `showStory` stay the same function for a view's whole life. A catalogue names a tab with `strings["tabs.<id>"]`.
+`text`, `showStory` and `send` stay the same function for a view's whole life. A catalogue names a tab with `strings["tabs.<id>"]`.
 
 ### Look
 
@@ -135,6 +148,8 @@ export const frame = definePluginFrame(({ report }) => ({
 - `decorators` wrap every story, outside the catalogue's own.
 - `report(value, { hint?, tab? })` tells the plugin's tabs. The value is JSON and replaces the last one, so it holds
   everything they need. `hint` is a short note beside the name of `tab`, the plugin's first by default.
+- `receive(value)` gets what the plugin's tab sends (`send`), in the order sent, in the stage's frame only. It answers, if
+  it does, with a `report`. What it throws goes to the page's error handler; the story stays as it is.
 
 What the `frame` function itself throws is shown in place of the story, in every frame: a broken frame module is not hidden.
 
@@ -164,13 +179,10 @@ registration of a name replaces a preset's, or removes it with `false`.
   shell is built.
 - **Tab order.** Fixed by the list of `plugins`; a plugin cannot sit before Props or after Accessibility.
 - **The shell's React.** No shell component, hook or state is exported; a React view has a root of its own.
-- **Tab-to-frame messages.** A tab cannot talk to its frame module, which only reports. Neither real plugin needs it, and it
-  can be added.
 - **The story index, the agents' tools, the tests.** A plugin cannot add a field to the index or a tool to `forgebook mcp`.
   That is why `parameters.design` stays Forgebook's: the link, its header button and its answers to agents work with no plugin.
 - **The docs pages' notes.** A block cannot report a problem to `forgebook pages`, and a plugin fence inside a list or a quote
   stays code, without a word.
-- **Plugins from presets.** A catalogue lists its own; a preset cannot. It can be added.
 - **Roles on switches, and what a value brings.** The colour scheme, the contrast, the language stay the catalogue's to
   declare; so do a value's `implies`, `preview` and `sheet`.
 - **The server tests.** `prepare` and `decorators` run in frames, so in the browser tests; a story rendered to a string

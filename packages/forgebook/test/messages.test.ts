@@ -82,6 +82,12 @@ describe("messages", () => {
     expect(isShellMessage({ type: "forgebook:args", args: { icon: (): number => 1 } })).toBe(false);
     expect(isShellMessage({ type: "forgebook:events", names: ["onValueChange"] })).toBe(true);
     expect(isShellMessage({ type: "forgebook:events", names: [1] })).toBe(false);
+    expect(
+      isShellMessage({ type: "forgebook:plugin-message", plugin: "acme", value: { ping: [1, "a"] } })
+    ).toBe(true);
+    expect(isShellMessage({ type: "forgebook:plugin-message", plugin: 1, value: 1 })).toBe(false);
+    expect(isShellMessage({ type: "forgebook:plugin-message", plugin: "acme", value: () => 1 })).toBe(false);
+    expect(isShellMessage({ type: "forgebook:plugin-message", plugin: "acme" })).toBe(false);
     const view = {
       switches: { theme: "dark", contrast: "more", motion: "reduced" },
       backdrop: "checkerboard",

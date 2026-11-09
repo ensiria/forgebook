@@ -39,7 +39,7 @@ import type { BuildOptions, ForgebookConfig } from "./config.ts";
 import { saysNoTokens, unknownKeysProblem } from "./configKeys.ts";
 import { configLoadMessage } from "./configLoadError.ts";
 import { framesProblem, type ResolvedFrames, resolvedFrames } from "./framesConfig.ts";
-import { pluginsProblem, withPluginSwitches } from "./pluginConfig.ts";
+import { pluginsProblem, withPluginSwitches, withPresetPlugins } from "./pluginConfig.ts";
 import { realFolder } from "./realFolder.ts";
 import { type ResolvedRefs, refsProblem, resolvedRefs } from "./refsConfig.ts";
 import { filesProblem } from "./storyPatterns.ts";
@@ -474,17 +474,19 @@ const homeOf = (config: ForgebookConfig, dir: string): string | undefined => {
 };
 
 /**
- * A configuration's plugins, once they can be used.
+ * A configuration's plugins, its presets' merged in, once they can be used.
  *
  * @param config - the configuration.
  * @param dir - the folder of its file.
  * @throws when they cannot.
  */
 const checkedPlugins = (config: ForgebookConfig, dir: string): readonly ForgebookPlugin[] => {
-  const plugins = config.plugins ?? [];
-  const problem = pluginsProblem(plugins, config.framework.name, dir);
-  if (problem !== undefined) throw new Error(`${resolve(dir, "forgebook.config")}: ${problem}`);
-  return plugins;
+  const file = resolve(dir, "forgebook.config");
+  const merged = withPresetPlugins(config);
+  if ("problem" in merged) throw new Error(`${file}: ${merged.problem}`);
+  const problem = pluginsProblem(merged.plugins, config.framework.name, dir);
+  if (problem !== undefined) throw new Error(`${file}: ${problem}`);
+  return merged.plugins;
 };
 
 /**

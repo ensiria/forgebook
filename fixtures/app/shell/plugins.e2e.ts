@@ -63,6 +63,16 @@ test.describe("a plugin's tab", () => {
     await expect(tab).toContainText("2");
   });
 
+  test("sends its frame module a value, which answers in its next report", async ({ page }) => {
+    await page.goto(`${PROBE}&tab=probe`);
+    const shown = page.getByTestId("probe-tab");
+    await expect(shown).toContainText('{"reports":1}');
+    await page.getByRole("button", { name: "Ping the frame" }).click();
+    await expect(shown).toContainText('"received":{"ping":1}');
+    await page.getByRole("button", { name: "Ping the frame" }).click();
+    await expect(shown).toContainText('"received":{"ping":2}');
+  });
+
   test("follows the shell's appearance", async ({ page }) => {
     await page.goto(`${PROBE}&tab=probe`);
     await expect(page.getByTestId("probe-tab")).toContainText("light");
