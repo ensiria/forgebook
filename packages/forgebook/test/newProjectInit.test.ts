@@ -114,6 +114,21 @@ describe("forgebook init in a new project", () => {
     expect(stepKinds(document)).toContain("provider");
   }, 30_000);
 
+  it("sets the theme as a `.dark` class where the app draws dark that way, and leaves it as it is elsewhere", () => {
+    const dark = projectWith({
+      ...NEW_PROJECTS["nuxt"],
+      "app/assets/main.css": "@custom-variant dark (&:is(.dark *));\n.dark { --background: black; }\n"
+    });
+    expect(initJson(dark).status).toBe(0);
+    const config = readFileSync(join(dark, "forgebook.config.ts"), "utf8");
+    expect(config).toContain("the app draws dark from a `.dark` class");
+    expect(config).toMatch(/apply: \{\s*kind: "class",\s*prefix: ""\s*\}/);
+    expect(config).toContain('id: "contrast"');
+    const plain = projectWith(NEW_PROJECTS["vue"] ?? {});
+    expect(initJson(plain).status).toBe(0);
+    expect(readFileSync(join(plain, "forgebook.config.ts"), "utf8")).not.toContain("switches");
+  }, 30_000);
+
   it("gives React Native's adapter what the project's packages ask for, and names what it does not read", () => {
     const dir = projectWith(NEW_PROJECTS["react-native-web"] ?? {});
     const { document } = initJson(dir);
