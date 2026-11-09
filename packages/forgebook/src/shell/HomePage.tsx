@@ -23,6 +23,7 @@ import {
 } from "../storyTree.ts";
 import { LATER_STRINGS } from "./laterStrings.ts";
 import { PackageHtml } from "./PackageHtml.tsx";
+import { usePageWidth } from "./PageWidth.tsx";
 import { PAGE_STRINGS } from "./pageStrings.ts";
 import { type Loaded, useLoaded } from "./useLoaded.ts";
 import type { RecentPage } from "./useRecentPages.ts";
@@ -356,11 +357,13 @@ export const HomePage = ({
   // it stops on a pattern that matches nothing
   const listingGlobs = storyGlobs.filter((glob) => !glob.startsWith("!") || glob.startsWith("!("));
   const isWaiting = listingGlobs.length > 0 && componentCount(tree) === 0;
+  const pageWidth = usePageWidth();
   return (
     <div className="forgebook-workspace">
       {header}
       <div className="forgebook-scroll">
-        <div className="forgebook-home">
+        <div className="forgebook-home__tools">{pageWidth.toggle}</div>
+        <div className="forgebook-home" data-page-width={pageWidth.width}>
           <header className="forgebook-home__head">
             <h1 className="forgebook-home__title">{title}</h1>
             <p className="forgebook-doc__lead">

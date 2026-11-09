@@ -127,6 +127,7 @@ export const LATER_STRINGS = lateStrings({
   backToPlace: "Back to its place",
   backToPlaceNamed: (name: string): string => `Back to its place: ${name}`,
   examples: "Examples",
+  pageContained: "Contained width",
   pageError: "The component's page could not be read",
   droppedArgs: "The link sets values this story does not take; they were left out:",
   droppedArgReasons: {

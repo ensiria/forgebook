@@ -1728,6 +1728,30 @@
     max-width: 22rem;
   }
 
+  // the page width's button (`PageWidth.tsx`), or the empty place of its size the header keeps where the page has
+  // none, so the picker stays put from a component's page to its stories'
+  .forgebook-page-width {
+    flex: none;
+    width: 1.625rem;
+  }
+
+  // at the home's top end, beside its title, in the column's padding; it scrolls with the home
+  .forgebook-home__tools {
+    display: flex;
+    justify-content: flex-end;
+    // no height of its own: the home's column starts where it would without it
+    height: 0;
+    padding: 0 $space-8;
+
+    > * {
+      position: relative;
+      // above the column, which comes after it and spans the whole width when the page is full
+      z-index: 1;
+      // level with the title's line, under the column's top padding
+      margin-top: $space-8;
+    }
+  }
+
   .forgebook-header__title {
     margin: 0;
     font: $text-display;
@@ -2264,6 +2288,17 @@
   // a designer's page gives the demo the room a wider column has; the frames' width follows it live
   .forgebook-doc[data-audience="designer"] {
     max-width: 72rem;
+  }
+
+  // the pages that list stories, the home and a component's page, follow the reader's width (`PageWidth.tsx`); a docs
+  // page keeps its reading column. A percentage, not `none`, so the change animates from the column's width
+  [data-page-width] {
+    transition: max-width $duration-medium $ease-out;
+  }
+
+  .forgebook-doc[data-page-width="full"],
+  .forgebook-home[data-page-width="full"] {
+    max-width: 100%;
   }
 
   .forgebook-doc__lead {
@@ -3024,6 +3059,10 @@
     .forgebook-home,
     .forgebook-stage-tools {
       animation-name: forgebook-appear;
+    }
+
+    [data-page-width] {
+      transition: none;
     }
 
     .forgebook-sidebar,
