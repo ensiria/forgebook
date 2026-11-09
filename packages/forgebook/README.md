@@ -252,6 +252,9 @@ too, with a warning.
   them and hides the rest in the View menu; their browser keeps it ([below](#the-toolbar)).
 - **A light and a dark catalogue**: the reader picks Light, Dark or System in the Interface menu at the sidebar's foot
   (their browser keeps it); `appearance` in the configuration sets the default. The stories keep their own theme, from the view's switches.
+- **Contained or full width**: the button beside the Stories picker, and at the top of the home, sets the home and a
+  component's page in a centred column (pressed, the default) or across the whole width; their browser keeps it. A
+  docs page keeps its reading column, and a story's page its own width controls.
 - **Keys and named views**: `?` lists the keys, as does the menu at the sidebar's foot, where a reader can turn off every
   key without a modifier for this browser; a key pressed inside a story, in a text field or in a custom element stays
   theirs. A key cycles a control's values (`t` the theme, Shift+`t` back); the catalogue sets the

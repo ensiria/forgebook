@@ -29,6 +29,7 @@ import {
 } from "./DocBlocks.tsx";
 import type { DocPageProps } from "./DocPage.tsx";
 import type { HomePageProps } from "./HomePage.tsx";
+import { usePageWidth } from "./PageWidth.tsx";
 import { PAGE_STRINGS } from "./pageStrings.ts";
 import { type Loaded, useLoaded } from "./useLoaded.ts";
 import { usePageFrames } from "./usePageFrames.ts";
@@ -111,6 +112,7 @@ export const AuthoredHome = ({
   const places = useMemo(() => blockPlaces(content.blocks), [content.blocks]);
   const values = useMemo(() => catalogueValues(title, tree), [title, tree]);
   const frames = usePageFrames({ stories, queued, pageRef, view, touchOverrides });
+  const pageWidth = usePageWidth();
   useScrollMemory(pageRef, scroll);
   const openLink = useCallback(
     (href: string): boolean => {
@@ -150,7 +152,12 @@ export const AuthoredHome = ({
     <div className="forgebook-workspace">
       {header}
       <div ref={pageRef} className="forgebook-scroll">
-        <div ref={bodyRef} className="forgebook-home forgebook-home--written">
+        <div className="forgebook-home__tools">{pageWidth.toggle}</div>
+        <div
+          ref={bodyRef}
+          className="forgebook-home forgebook-home--written"
+          data-page-width={pageWidth.width}
+        >
           {/* the written title only: the catalogue's would show for a moment and be replaced */}
           {loaded.status === "loading" ? null : (
             <header className="forgebook-home__head">

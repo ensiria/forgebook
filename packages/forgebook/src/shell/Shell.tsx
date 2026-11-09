@@ -1048,7 +1048,9 @@ const ShellPage = ({
   const storyHrefOf = (story: TreeStory): string => addressQuery(pageAddress(storyPage(story)), catalogue);
   const columnHeightOf = (storyId: string): number | undefined =>
     knownHeight(storyHeights, storyId, drawnWidth(address.view.width, PAGE_COLUMN_WIDTH));
-  const header = (
+  // the component's page puts its width's button in the header (`PageWidth.tsx`); until then, and on a story's page,
+  // an empty place of the button's size keeps the picker where it stays
+  const headerWith = (tools: ReactNode): ReactNode => (
     <ShellHeader
       problems={problems}
       location={location}
@@ -1062,7 +1064,9 @@ const ShellPage = ({
             currentStoryId={shownStoryId}
             onOpenComponent={(): void => openPage(componentPage(location.component))}
             onOpenStory={(story: TreeStory): void => openPage(storyPage(story))}
-          />
+          >
+            {tools}
+          </StoryPicker>
         )
       }
       related={
@@ -1074,6 +1078,7 @@ const ShellPage = ({
       }
     />
   );
+  const header = headerWith(<span className="forgebook-page-width" />);
 
   const homeProps = {
     title,
@@ -1184,7 +1189,7 @@ const ShellPage = ({
                 isSystemDark
               ),
               heightOf: columnHeightOf,
-              header,
+              headerWith,
               scroll,
               usedIn: usedInLinks(source, catalogue.hasUsedIn, tree, {
                 hrefOf: (page: Page): string => addressQuery(pageAddress(page), catalogue),
