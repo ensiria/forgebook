@@ -24,7 +24,7 @@ const REPORT_EVENT = "probe:report";
 let reports = 0;
 
 /** What the tab sent last; none before it sent. */
-let received: unknown;
+let received: JsonValue | undefined;
 
 /** The probe's frame. */
 export const frame = definePluginFrame(
