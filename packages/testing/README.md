@@ -128,7 +128,8 @@ A test fails on a story its frame gave up on (status `pending`: something still 
 `parameters.suspense`), with the frame's reason, before any check runs: a fallback is not what the check is for.
 
 A story about logic (`parameters: { logic: true }`, a hook's or a function's scene) is tested once, in the catalogue's
-default view, named `logic`: the variants only change how it looks. Its test still waits for the frame to be ready, so
+default view, or in the view of the first variant when a run names its own `variants`, named `logic`: the variants only
+change how it looks. Its test still waits for the frame to be ready, so
 its play has to pass, and fails on an error in the page; axe runs too, since the scene is a page a person uses and a
 demo that fails WCAG is a bad example to copy. The checks about looks are left out: the spills and the overlays (layout
 at the variants' widths) and the package's own `check`, and a screenshot run takes no reference image of it.
