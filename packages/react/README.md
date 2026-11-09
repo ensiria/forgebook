@@ -41,5 +41,14 @@ export const Default: Story<typeof Badge> = { args: { label: "New" } };
 | `@forgebook/react/vite` | `react()`, the framework adapter of `forgebook.config.ts`; it takes `@vitejs/plugin-react`'s options, as `react({ include: /\.[jt]sx?$/ })` to give Fast Refresh to `.js` files |
 | `@forgebook/react/texts`, `@forgebook/react/clock` | A story's texts in the catalogue's language, and the story clock, as hooks |
 
+`useStoryText()` returns the same function on every render while the language shown stays the same (a theme, a width or
+new args do not change it), and a new one when the reader switches language. A `useMemo` keyed on it, a table's
+columns or a story's data, is so built again exactly on a language switch:
+
+```tsx
+const text = useStoryText();
+const columns = useMemo(() => [{ id: "name", header: text("users.name") }], [text]);
+```
+
 The rest of its exports are what the catalogue loads itself. Getting started, the catalogue's features and its
 commands: [Forgebook's README](https://github.com/ensiria/forgebook/blob/develop/packages/forgebook/README.md).

@@ -12,22 +12,19 @@
  *
  * @module
  */
-import { type Dirent, existsSync, readdirSync } from "node:fs";
+import { type Dirent, existsSync } from "node:fs";
 import { join } from "node:path";
 
+import type { ViewSwitch } from "../../../src/switches.ts";
 import { STORY_FILE } from "../../../src/vite/autoTitle.ts";
 import { projectTitle } from "../importers/storybook.ts";
 import type { ImportedFramework } from "../importers/storybookFrameworks.ts";
+import { classDarkSwitches, hasClassDarkScheme } from "./darkScheme.ts";
 import type { NextStep } from "./newProject.types.ts";
 import { PROJECT_FRAMEWORKS } from "./projectFrameworks.ts";
 import { hasPostcssConfig, readProjectLook } from "./projectLook.ts";
 import { declaredPackages, installedVersion } from "./projectPackages.ts";
-
-/** The folders never searched for story files: what is installed, built, or the tools' own. */
-const SKIPPED_FOLDERS = new Set(["node_modules", "dist", "build", "out", "coverage", "public"]);
-
-/** How many folders a search for story files goes through, so a huge repository's first run stays quick. */
-const SEARCH_LIMIT = 5000;
+import { isSearched, readableEntries, SEARCH_LIMIT } from "./projectWalk.ts";
 
 /** What `forgebook init` will write for a project. */
 export type NewProjectPlan = {
@@ -45,15 +42,8 @@ export type NewProjectPlan = {
   readonly nextSteps: readonly NextStep[];
   /** The packages the project's own setup asks for, beyond the adapter's. */
   readonly extraPeers: readonly string[];
-};
-
-/** A folder's entries; none for one the command may not read, which only leaves its stories out. */
-const readableEntries = (dir: string): readonly Dirent[] => {
-  try {
-    return readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
+  /** The view switches, when Forgebook's own would not draw the project's dark scheme; none for those. */
+  readonly switches: readonly ViewSwitch[] | undefined;
 };
 
 /** A folder in the search for story files, with the project's top folder it is under (`""` for the project's own). */
@@ -61,9 +51,7 @@ type SearchedFolder = { readonly dir: string; readonly top: string };
 
 /** The folders to search below a folder. */
 const foldersBelow = ({ dir, top }: SearchedFolder, entries: readonly Dirent[]): readonly SearchedFolder[] =>
-  entries
-    .filter((entry) => entry.isDirectory() && !entry.name.startsWith(".") && !SKIPPED_FOLDERS.has(entry.name))
-    .map((entry) => ({ dir: join(dir, entry.name), top: top || entry.name }));
+  entries.filter(isSearched).map((entry) => ({ dir: join(dir, entry.name), top: top || entry.name }));
 
 /** The folders holding story files already, and those files' extensions. */
 const existingStories = (
@@ -226,6 +214,7 @@ export const planNewProject = (projectDir: string, framework: ImportedFramework)
         : [])
     ],
     // React Native's adapter imports PostCSS when the project has a configuration for it
-    extraPeers: framework === "react-native-web" && hasPostcssConfig(projectDir) ? ["postcss"] : []
+    extraPeers: framework === "react-native-web" && hasPostcssConfig(projectDir) ? ["postcss"] : [],
+    switches: hasClassDarkScheme(projectDir) ? classDarkSwitches() : undefined
   };
 };

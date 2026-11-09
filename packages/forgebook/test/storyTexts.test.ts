@@ -14,6 +14,32 @@ const TEXTS = {
 };
 
 describe("story texts", () => {
+  it("hands the same table while the language and the texts stay, and another for another language", async () => {
+    const italian = { id: "it", label: "Italiano" };
+    const first = await shownTexts(TEXTS, italian);
+    expect(await shownTexts(TEXTS, italian)).toBe(first);
+    expect(await shownTexts(TEXTS, { id: "it", label: "Italiano" })).toBe(first);
+    expect(await shownTexts(TEXTS, undefined)).not.toBe(first);
+    expect(await shownTexts({ ...TEXTS }, italian)).not.toBe(first);
+    expect(await shownTexts(undefined, undefined)).toBe(await shownTexts(undefined, undefined));
+  });
+
+  it("reads a language again after its loader failed", async () => {
+    let calls = 0;
+    const texts = {
+      en: { "card.title": "Projects" },
+      it: async (): Promise<{ readonly default: Record<string, string> }> => {
+        calls += 1;
+        if (calls === 1) throw new Error("offline");
+        return { default: { "card.title": "Progetti" } };
+      }
+    };
+    const italian = { id: "it", label: "Italiano" };
+    await expect(shownTexts(texts, italian)).rejects.toThrow("offline");
+    expect(await shownTexts(texts, italian)).toEqual({ "card.title": "Progetti" });
+    expect(calls).toBe(2);
+  });
+
   it("draws the English table for the stories' own language", async () => {
     expect(await shownTexts(TEXTS, undefined)).toEqual(TEXTS.en);
   });

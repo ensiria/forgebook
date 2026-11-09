@@ -73,7 +73,8 @@ The framework's own guide (`forgebook guide <framework>`) has what differs in yo
 - `parameters.msw: { handlers: [...] }` answers a story's requests, with `@forgebook/plugin-msw` listed in the
   configuration's `plugins`, which also adds a Network tab; without the plugin the parameter does nothing.
 - Texts a person reads come from the source's texts, not from the story: `args: { label: storyText("badge.new") }`
-  (`@forgebook/story-format/texts`), or `useStoryText()` inside a `render`. A source gives each language's table, or a
+  (`@forgebook/story-format/texts`), or `useStoryText()` inside a `render`; in React its function stays the same until
+  the language changes, so a `useMemo` keyed on it rebuilds only then. A source gives each language's table, or a
   loader of it (`texts: { en: () => import("./locales/en.json") }`), which keeps the texts out of the catalogue's page.
 - Write `title`, `parameters.main`, `group`, `height`, `touch`, `logic`, `requiredFirst` and `design.figma` as plain
   values: the catalogue reads them without running the file.

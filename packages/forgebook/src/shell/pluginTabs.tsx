@@ -20,6 +20,7 @@ import type {
 } from "../plugin.ts";
 import type { AsideStory } from "./asideStory.ts";
 import type { DockTab } from "./Dock.tsx";
+import { tellFrames } from "./FrameView.tsx";
 import { LazyHost } from "./LazyHost.tsx";
 
 /** A plugin's tab as the generated page hands it over: its declaration, and the import of its view. */
@@ -77,6 +78,12 @@ export type PluginTabsInput = {
   readonly aside: AsideStory;
 };
 
+/**
+ * The stage's pane, which holds the frame that shows the story: what a tab sends goes there. Found when a tab sends, so
+ * the stage, in the shell's first load, carries nothing for it.
+ */
+const STAGE_PANE = ".forgebook-story-pane";
+
 /** Loads the host of a tab. */
 const loadHost = async (): Promise<typeof import("./PluginTabHost.tsx").PluginTabHost> =>
   (await import("./PluginTabHost.tsx")).PluginTabHost;
@@ -115,6 +122,15 @@ const pluginTabContent = (
       strings,
       story,
       report: isComparing ? undefined : reports.get(`${story.id}|${plugin.id}`)?.value,
+      // the compare view's frames each show the story: none of them is the one a tab talks to
+      send: isComparing
+        ? undefined
+        : (value: JsonValue): void =>
+            tellFrames(document.querySelector<HTMLElement>(STAGE_PANE), {
+              type: "forgebook:plugin-message",
+              plugin: plugin.id,
+              value
+            }),
       // the compare view's address already says the whole view
       aside: isComparing ? { ...aside, view: undefined } : aside
     }}

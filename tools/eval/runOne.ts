@@ -265,18 +265,19 @@ export const runOne = async (planned: PlannedRun, context: RunContext): Promise<
   const files = await filesStep(context, change.workspace, change.base, change.head, out);
   const folder = await measureCopy(context, change, files.measured, out);
   const [app, catalogue, frames] = [context.port, context.port + 1, context.port + 2];
+  const appOrigin = `http://localhost:${app}${context.app.basePath}`;
   const pages = await whileServing(
     serve(
       context,
       folder,
       context.app.dev.map((word) => word.replaceAll("{port}", String(app))),
       [app],
-      `http://localhost:${app}${context.app.readyPath}`
+      `${appOrigin}${context.app.readyPath}`
     ),
     () =>
       runPages({
         browser: context.browser,
-        origin: `http://localhost:${app}`,
+        origin: appOrigin,
         folder,
         states: context.task.states,
         acceptance: context.task.acceptance,

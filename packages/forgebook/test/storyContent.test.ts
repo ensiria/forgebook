@@ -282,3 +282,114 @@ describe("contentSettled", () => {
     expect(looks).toBe(1);
   });
 });
+
+/** What a module's wrapped `import()` calls, as the plugin writes it. */
+const trackImport = <T>(loading: Promise<T>): Promise<T> => {
+  const track = (globalThis as unknown as Record<symbol, ((each: Promise<T>) => Promise<T>) | undefined>)[
+    Symbol.for("forgebook.startedImports")
+  ];
+  return track === undefined ? loading : track(loading);
+};
+
+/**
+ * Runs a story whose first drawing starts imports, on a framework with no loading state of its own.
+ *
+ * @param starts - what the drawing imports, each a promise made when it is drawn.
+ * @param fields - the story.
+ * @param afterDrawn - an import started once the story is drawn, not by its first drawing.
+ */
+const runImporting = async (
+  starts: readonly (() => Promise<unknown>)[],
+  fields: Record<string, unknown> = {},
+  afterDrawn?: () => Promise<unknown>
+): Promise<{ readonly lines: readonly string[]; readonly outcome: StoryOutcome; readonly ms: number }> => {
+  const lines: string[] = [];
+  const renderer: FrameRenderer = {
+    mount: (): MountedStory => {
+      for (const start of starts)
+        void trackImport(start()).then(
+          () => lines.push("imported"),
+          () => lines.push("failed")
+        );
+      const drawn = Promise.resolve();
+      // once drawn, as a timer or a click would start it
+      if (afterDrawn !== undefined) setTimeout(() => void trackImport(afterDrawn()), 0);
+      return { drawn, update: (): undefined => undefined, unmount: (): undefined => undefined };
+    }
+  };
+  const begun = performance.now();
+  const outcome = await new Promise<StoryOutcome>((resolve) => {
+    runStory({
+      container: document.createElement("div"),
+      story: storyOf({ play: (): void => void lines.push("play"), ...fields }),
+      identity: { id: "kit-late--shown", name: "Shown", title: "Kit/Late" },
+      pluginSetups: [],
+      renderer,
+      clock: heldFrameClock(0),
+      texts: {},
+      decorators: [],
+      globals: {},
+      resolveArgs: (args: PanelArgs): PanelArgs => args,
+      onControlsReady: (_controls: StoryControls, ended: StoryOutcome): void => resolve(ended),
+      onEvent: () => undefined,
+      panelArgsOf: () => ({}),
+      onArgsChange: () => undefined,
+      onError: () => undefined,
+      onTrace: () => undefined
+    });
+  });
+  return { lines, outcome, ms: performance.now() - begun };
+};
+
+/** A promise settled after a while. */
+const settledAfter = (ms: number, isRejected = false): Promise<unknown> =>
+  new Promise((resolve, reject) =>
+    setTimeout(() => (isRejected ? reject(new Error("chunk failed")) : resolve({})), ms)
+  );
+
+describe("the frame's wait for the modules a story imports while first drawn", () => {
+  it("plays and is ready only once a lazy part's module came", async () => {
+    const { lines, outcome } = await runImporting([(): Promise<unknown> => settledAfter(120)]);
+    expect(lines).toEqual(["imported", "play"]);
+    expect(outcome).toEqual({ status: "ready" });
+  });
+
+  it("is ready once a chunk that fails has failed: the story shows what it does then", async () => {
+    const { lines, outcome } = await runImporting([
+      (): Promise<unknown> => settledAfter(80, true),
+      (): Promise<unknown> => settledAfter(120)
+    ]);
+    expect(lines).toEqual(["failed", "imported", "play"]);
+    expect(outcome).toEqual({ status: "ready" });
+  });
+
+  it("is pending, never ready, when a module never comes within the story's bound", async () => {
+    const never = (): Promise<unknown> => new Promise(() => undefined);
+    const { lines, outcome } = await runImporting([never, (): Promise<unknown> => settledAfter(10)], {
+      parameters: { suspense: { timeout: 200 } }
+    });
+    expect(lines).toEqual(["imported"]);
+    expect(outcome).toMatchObject({
+      status: "pending",
+      reason: expect.stringMatching(/^The story still loads 1 of the 2 modules .* after 200 ms\./)
+    });
+  });
+
+  it("adds no wait to a story that imports nothing", async () => {
+    const { lines, outcome, ms } = await runImporting([]);
+    expect(lines).toEqual(["play"]);
+    expect(outcome).toEqual({ status: "ready" });
+    expect(ms).toBeLessThan(50);
+  });
+
+  it("does not wait for what starts after the first drawing", async () => {
+    const { lines, outcome, ms } = await runImporting(
+      [],
+      { play: undefined },
+      () => new Promise(() => undefined)
+    );
+    expect(lines).toEqual([]);
+    expect(outcome).toEqual({ status: "ready" });
+    expect(ms).toBeLessThan(50);
+  });
+});

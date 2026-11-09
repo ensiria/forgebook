@@ -41,6 +41,13 @@ export type ForgebookPreset = CatalogueLists & {
    * with a plugin's trust, as the catalogue's own do.
    */
   readonly argControls?: Readonly<Record<string, string | ArgControlOption>>;
+  /**
+   * Plugins it brings to every catalogue that lists it, before the catalogue's own: a library's tab or frame module,
+   * with no line in each catalogue. Their modules are specifiers the catalogue's folder resolves, so a preset names them
+   * by absolute path or by a package the catalogue installs. A catalogue's plugin of the same id replaces one, and
+   * `presetPlugins: { <id>: false }` leaves one out.
+   */
+  readonly plugins?: readonly ForgebookPlugin[];
 };
 
 /**
@@ -136,8 +143,13 @@ export type ForgebookConfig = CatalogueLists & {
   readonly watch?: readonly string[];
   /** The libraries' presets, in order; the configuration's own values win over theirs. */
   readonly presets?: readonly ForgebookPreset[];
-  /** The plugins, in order (`[figma()]`): a package adds nothing to the catalogue until it is listed here. */
+  /**
+   * The plugins, in order (`[figma()]`): a package adds nothing to the catalogue until it is listed here or by a preset.
+   * A plugin listed here replaces a preset's of the same id.
+   */
   readonly plugins?: readonly ForgebookPlugin[];
+  /** The presets' plugins left out, by id (`{ acme: false }`); naming one no preset brings stops the catalogue. */
+  readonly presetPlugins?: Readonly<Record<string, false>>;
   /**
    * Where the stories' frames run. On the dev server, an origin of their own by default (the catalogue's port + 1), so
    * a story's code cannot reach the catalogue's page, its agent API or the project's files; a build keeps the

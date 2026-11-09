@@ -73,6 +73,7 @@ const CONFIG_KEYS: KeysOf<ForgebookConfig> = {
   watch: true,
   presets: true,
   plugins: true,
+  presetPlugins: true,
   frames: true,
   build: true,
   appBuild: true,
@@ -88,7 +89,8 @@ const PRESET_KEYS: KeysOf<ForgebookPreset> = {
   preview: true,
   head: true,
   shell: true,
-  argControls: true
+  argControls: true,
+  plugins: true
 };
 
 const BUILD_KEYS: KeysOf<BuildOptions> = { readableNames: true };

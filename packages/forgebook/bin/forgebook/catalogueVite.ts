@@ -12,6 +12,7 @@ import type { ResolvedConfig } from "../../src/vite/configFile.ts";
 import { forgebookPlugin } from "../../src/vite/forgebookPlugin.ts";
 import { ISOLATED_FRAMES } from "../../src/vite/framesConfig.ts";
 import { serverConditions } from "../../src/vite/serverConditions.ts";
+import { trackedImportsPlugin } from "../../src/vite/trackedImports.ts";
 import { appBuildOf } from "./appBuild/appBuild.ts";
 import { unresolvedImports } from "./viteCache.ts";
 
@@ -60,7 +61,9 @@ export const catalogueVite = async (
       ...app.plugins,
       ...(overrides.plugins ?? []),
       // the server loads the stories and previews for tools: it resolves them as the pages do
-      serverConditions()
+      serverConditions(),
+      // a frame waits for the modules a story imports while first drawn
+      trackedImportsPlugin()
     ]
   };
 };
