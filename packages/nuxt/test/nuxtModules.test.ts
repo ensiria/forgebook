@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   builtFile,
   builtScriptName,
+  isBuiltHere,
   isWrittenByNuxt,
   loadNuxtModules,
   moduleComponents,
@@ -104,9 +105,29 @@ describe("a module's components", () => {
       { name: "UCard", file: `${PROJECT}/node_modules/@nuxt/ui/dist/runtime/components/Card.vue` }
     ]);
   });
+
+  it("keep the export a component is registered by, when it is not the default", () => {
+    const text = [
+      `export const Button: typeof import("../app/components/ui/button/index")['Button']`,
+      `export const LazyButton: LazyComponent<typeof import("../app/components/ui/button/index")['Button']>`,
+      `export const Input: typeof import("../app/components/ui/input/index").Input`
+    ].join("\n");
+    expect(moduleComponents(text, BUILD)).toEqual([
+      { name: "Button", file: `${PROJECT}/app/components/ui/button/index`, exportName: "Button" },
+      { name: "Input", file: `${PROJECT}/app/components/ui/input/index`, exportName: "Input" }
+    ]);
+  });
 });
 
 describe("the build folder", () => {
+  it("is this project's only when its app config imports the project's own", () => {
+    const own = `${PROJECT}/app/app.config.ts`;
+    expect(isBuiltHere(`import cfg0 from "${own}"`, own)).toBe(true);
+    expect(isBuiltHere(`import cfg0 from "/elsewhere/app/app.config.ts"`, own)).toBe(false);
+    expect(isBuiltHere("", own)).toBe(true);
+    expect(isBuiltHere(`import cfg0 from "/elsewhere/app/app.config.ts"`, undefined)).toBe(true);
+  });
+
   it("gives a file Nuxt wrote, its extension left out or not", () => {
     const dir = folderWith({ "app.config.mjs": "", "ui.css": "" });
     expect(builtFile("#build/app.config", dir)).toBe(normalizePath(join(dir, "app.config.mjs")));
