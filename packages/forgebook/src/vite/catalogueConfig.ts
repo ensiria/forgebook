@@ -1,6 +1,7 @@
 /**
  * What Forgebook's plugin sets in Vite's configuration for a catalogue: its folder as the root, what to pre-bundle, the
- * pages as the build's inputs, the build's script names, and the dev server's reads kept to each origin.
+ * pages as the build's inputs, the build's script names, no single-page fallback, and the dev server's reads kept to
+ * each origin.
  *
  * @module
  */
@@ -78,6 +79,10 @@ export const catalogueConfig = (
         : { output: { chunkFileNames: "assets/[hash].js", hashCharacters: "base36" } })
     }
   },
+  // the plugin serves the catalogue's pages itself, so the only page a single-page fallback could answer with is the
+  // app's own `index.html`: a story's missing image would get it, and the server would load the whole app its scripts
+  // reach, pre-bundle again what the stories never import, and reload every frame open (unless the app chose its own)
+  ...(userConfig.appType === undefined ? { appType: "mpa" } : {}),
   // Vite lets any localhost page read the server: neither origin needs another's reads, and the guards
   // would be the only wall left between the frames and the catalogue (unless the app chose its own)
   ...(config.frames.kind === "isolated" && userConfig.server?.cors === undefined

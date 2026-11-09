@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { verifyText } from "../bin/forgebook/agentText.ts";
 import { isVerifyFailure } from "../bin/forgebook/verifyRun.ts";
 import { type VerifyFindings, verifyDocument } from "../bin/forgebook/verifyVerdict.ts";
-import type { StoryCheckReport } from "../src/storyCheck.ts";
+import type { StoryCheckReport, StoryWarning } from "../src/storyCheck.ts";
 import type {
   ChangedStoriesDocument,
   ChangedUiFile,
@@ -204,6 +204,29 @@ describe("verifyDocument", () => {
     const document = verifyDocument(seed);
     expect(isVerifyFailure(document)).toBe(true);
     expect(document.summary).toContain(says);
+  });
+
+  it("verifies a change whose stories ask for a missing image, and lists it once among the warnings", () => {
+    const warning: StoryWarning = {
+      kind: "missing-file",
+      path: "/avatars/01.png",
+      message: "/avatars/01.png is not there (404): the story runs without it"
+    };
+    const document = verifyDocument(
+      findings({
+        report: {
+          schema: 1,
+          results: [
+            { storyId: STORY, view: "light", frame: "f", problems: [], warnings: [warning] },
+            { storyId: STORY, view: "dark", frame: "f", problems: [], warnings: [warning] }
+          ]
+        }
+      })
+    );
+    expect(document.verdict).toBe("verified");
+    expect(document.problems).toBe(0);
+    expect(document.warnings).toEqual([{ ...warning, stories: [STORY] }]);
+    expect(document.summary).toContain("1 warning: /avatars/01.png is missing");
   });
 
   it("answers not verified on a configuration problem, and still gives what the stories found", () => {

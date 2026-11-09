@@ -332,6 +332,7 @@ describe("the verify tool", () => {
         ran: 0,
         failures: [],
         notVerified: [],
+        warnings: [],
         code: { checked: [], problems: [], notes: [] },
         problems: 0,
         unseen: []
