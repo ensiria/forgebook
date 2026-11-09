@@ -24,6 +24,8 @@ export type PluginTabHostProps = {
   readonly report: JsonValue | undefined;
   /** How the story is drawn again for the view. */
   readonly aside: AsideStory;
+  /** Sends the plugin's frame module a value; none where no frame is the story's (the compare view). */
+  readonly send: ((value: JsonValue) => void) | undefined;
 };
 
 /**
@@ -37,7 +39,8 @@ export const PluginTabHost = ({
   strings,
   story,
   report,
-  aside
+  aside,
+  send
 }: PluginTabHostProps): ReactNode => {
   const appearance = useShellAppearance();
   // read when the view asks: the stage of that moment, without a new context for every change of the stage
@@ -62,10 +65,14 @@ export const PluginTabHost = ({
     if (args === undefined) return;
     for (const frame of asideFrames.current) frame.settle(args);
   }, [args]);
+  // read when the view sends: the same function for the view's whole life, whichever view the stage shows
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  const sendToFrame = useCallback((value: JsonValue): void => sendRef.current?.(value), []);
   const text = useMemo(() => pluginText(strings, pluginId), [strings, pluginId]);
   const context = useMemo(
-    (): PluginTabContext => ({ appearance, text, story, report, showStory }),
-    [appearance, text, story, report, showStory]
+    (): PluginTabContext => ({ appearance, text, story, report, send: sendToFrame, showStory }),
+    [appearance, text, story, report, sendToFrame, showStory]
   );
   return <PluginViewHost load={load} context={context} />;
 };

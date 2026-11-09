@@ -247,6 +247,14 @@ export type ShellMessage =
       readonly type: "forgebook:view";
       /** The switches' values, the backdrop and the text size. */
       readonly view: LiveView;
+    }
+  | {
+      /** A plugin's tab sent its frame module a value (`send`). */
+      readonly type: "forgebook:plugin-message";
+      /** The plugin's id. */
+      readonly plugin: string;
+      /** What the frame module's `receive` gets. */
+      readonly value: JsonValue;
     };
 
 /** Whether a value is a plain object. */
@@ -361,7 +369,7 @@ const isTextKeys = (value: unknown): value is Readonly<Record<string, string>> =
   isRecord(value) && Object.values(value).every((key) => typeof key === "string");
 
 /** Whether a value stays what it is as JSON. */
-const isJsonValue = (value: unknown): value is JsonValue => {
+export const isJsonValue = (value: unknown): value is JsonValue => {
   if (value === null || typeof value === "string" || typeof value === "boolean") return true;
   if (typeof value === "number") return Number.isFinite(value);
   if (Array.isArray(value)) return value.every(isJsonValue);

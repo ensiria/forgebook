@@ -1540,8 +1540,10 @@ import { msw } from "@forgebook/plugin-msw";
 export default defineConfig({ /* … */ plugins: [figma(), msw()] });
 ```
 
-A plugin can add a panel tab, a toolbar switch, a docs block, and what runs around a story in its frame; it cannot rearrange
-the shell. Turn a plugin's tab off like any other (`tabs: { figma: false }`), rename it (`strings: { "tabs.figma": "Figma" }`)
+A plugin can add a panel tab, a toolbar switch, a docs block, and what runs around a story in its frame, which its tab can
+send messages to; it cannot rearrange the shell. A library's preset can bring its plugins too (`plugins` in the preset),
+before the catalogue's own: a plugin the catalogue lists with the same id replaces it, and
+`presetPlugins: { <id>: false }` leaves one out (an id no preset brings is an error). Turn a plugin's tab off like any other (`tabs: { figma: false }`), rename it (`strings: { "tabs.figma": "Figma" }`)
 or translate its texts (`strings: { "plugin.figma.compare": "Confronta" }`). `forgebook plugins --json` and `list_plugins`
 say what a catalogue has.
 

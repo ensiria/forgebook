@@ -45,8 +45,7 @@ import {
   languageOf,
   liveView,
   type MeasureTool,
-  parseView,
-  type SheetsChoice
+  parseView
 } from "../viewState.ts";
 import { detailOf, previewValue } from "./callValues.ts";
 import { followCanvasScheme } from "./canvasScheme.ts";
@@ -74,6 +73,7 @@ import type { StoryOutcome } from "./storyContent.ts";
 import { mergedPreviews, readPreview, readStory, startingGlobals } from "./storyModule.ts";
 import { runStory, type StoryControls, type StoryRunOptions } from "./storyRun.ts";
 import type { ValueSheets } from "./valueSheets.ts";
+import { type ValueSheetsShower, valueSheetsShower } from "./valueSheetsShower.ts";
 
 /** What an app passes to the frame. */
 export type FrameConfig = {
@@ -145,30 +145,6 @@ import.meta.hot?.on("vite:error", ({ err }): void => {
   followServedError?.();
   followServedError = undefined;
 });
-
-/** What shows the sheets of the values drawn, and answers once they have loaded whether it is still the last asked. */
-type ValueSheetsShower = (values: Readonly<Record<string, string>>) => Promise<boolean>;
-
-/**
- * What shows the sheets of a frame's values; none for a catalogue with none, which so loads no code for them.
- *
- * @param valueSheets - each value's sheet, when the catalogue has any.
- * @param sheets - the frame's Styles setting.
- * @param switches - the catalogue's switches.
- * @param onFailed - told a sheet that did not load: the story is drawn without it.
- */
-const valueSheetsShower = async (
-  valueSheets: ValueSheets | undefined,
-  sheets: SheetsChoice,
-  switches: readonly ViewSwitch[],
-  onFailed: (message: string) => void
-): Promise<ValueSheetsShower | undefined> => {
-  if (valueSheets === undefined) return undefined;
-  const { valueSheetUrls, valueSheetsIn } = await import("./valueSheets.ts");
-  const show = valueSheetsIn(document, onFailed);
-  return (values: Readonly<Record<string, string>>): Promise<boolean> =>
-    show(valueSheetUrls(values, sheets, valueSheets, switches));
-};
 
 /**
  * Fails a frame whose story did not load, with the dev server's reason when the import only says it failed, as soon as
@@ -406,11 +382,12 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     const clock = storyFrameClock(story.clockStart, isClockHeldIn(window.location.search));
     // the controls with a frame module, which turn the panel's values first; their docs name those given by type
     const typed = panelControls(config.argControls, source, location.story.file, reportError);
-    shell.listen((message: ShellMessage): void =>
+    shell.listen((message: ShellMessage): void => {
+      if (plugins.take(message)) return;
       typed.take(message, { story, controls, tellReady }, (drawn: StoryControls) =>
         answerShell(message, drawn, storyId, pendingReason, catalogue.a11y, config.axeUrl, tellShell)
-      )
-    );
+      );
+    });
     // the language's texts, and the switches the story reads (the language's provider reads its id among them); a
     // language the source gives as a loader is loaded as it is shown
     const shownFor = async (

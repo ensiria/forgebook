@@ -17,6 +17,7 @@ import { PANEL_TAB_IDS } from "../catalogue.ts";
 import type { ForgebookPlugin, PluginSwitch } from "../plugin.ts";
 import { DEFAULT_SWITCHES, type ViewSwitch } from "../switches.ts";
 import type { PluginsDocument } from "./agent.types.ts";
+import type { ForgebookConfig } from "./config.ts";
 
 /** The versions of the contract this Forgebook speaks. */
 export const SUPPORTED_PLUGIN_API_VERSIONS: readonly number[] = [1];
@@ -275,3 +276,27 @@ export const pluginsDocument = (plugins: readonly ForgebookPlugin[]): PluginsDoc
     runsInFrames: plugin.frame !== undefined
   }))
 });
+
+/**
+ * The plugins a catalogue runs: its presets', in their order, then its own; one of its own replaces a preset's of the
+ * same id, and one it leaves out (`presetPlugins: { <id>: false }`) is dropped.
+ *
+ * @param config - the catalogue's plugins, the presets' it leaves out, and its presets.
+ * @returns the plugins, or why the list of those left out cannot be read.
+ */
+export const withPresetPlugins = (
+  config: Pick<ForgebookConfig, "plugins" | "presetPlugins" | "presets">
+): { readonly plugins: readonly ForgebookPlugin[] } | { readonly problem: string } => {
+  const own = config.plugins ?? [];
+  const brought = (config.presets ?? []).flatMap((preset) => preset.plugins ?? []);
+  const leftOut = Object.entries(config.presetPlugins ?? {});
+  const wrong = leftOut.find(([, value]) => value !== false);
+  if (wrong !== undefined) return { problem: `presetPlugins.${wrong[0]} can only be false` };
+  const unknown = leftOut.find(([id]) => !brought.some((plugin) => plugin.id === id));
+  if (unknown !== undefined)
+    return { problem: `presetPlugins names "${unknown[0]}", which no preset of this catalogue brings` };
+  const ownIds = new Set(own.map((plugin) => plugin.id));
+  const dropped = new Set(leftOut.map(([id]) => id));
+  const kept = brought.filter((plugin) => !ownIds.has(plugin.id) && !dropped.has(plugin.id));
+  return { plugins: [...kept, ...own] };
+};

@@ -156,6 +156,14 @@ export type PluginTabContext = PluginViewContext & {
    */
   readonly report: JsonValue | undefined;
   /**
+   * Sends a value to the plugin's frame module in the stage's frame, whose `receive` gets it; it answers, if it does,
+   * with a `report`. Nothing is sent in the compare view, where no frame is the story's, nor before the frame loaded.
+   * Optional in the context, since an older Forgebook does not give it. The same function for the view's whole life.
+   *
+   * @param value - JSON: a message is a copy, never a shared object.
+   */
+  readonly send?: (value: JsonValue) => void;
+  /**
    * Draws the story again in an element of the view, at the stage's width, with the panel's values and the view of
    * this moment; a second frame, which tells the stage nothing. The same function for the view's whole life.
    *
@@ -248,6 +256,11 @@ export type PluginFrame = {
    * is shown as the story's error.
    */
   readonly prepare?: LoadedBeforeEach;
+  /**
+   * Gets what the plugin's tab sends (`send`), in the stage's frame only, in the order sent. What it throws goes to the
+   * page's error handler; the story stays as it is.
+   */
+  readonly receive?: (value: JsonValue) => void;
 };
 
 /**

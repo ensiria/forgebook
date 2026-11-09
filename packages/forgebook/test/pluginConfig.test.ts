@@ -184,6 +184,35 @@ describe("a configuration with plugins", () => {
     expect(resolveConfig(config, "/catalogue").plugins).toEqual([]);
   });
 
+  it("takes its presets' first, a plugin of its own replacing a preset's, and one it leaves out dropped", () => {
+    const figma: ForgebookPlugin = { apiVersion: 1, id: "figma" };
+    const kit: ForgebookPlugin = { apiVersion: 1, id: "kit" };
+    const ownAcme: ForgebookPlugin = { apiVersion: 1, id: "acme", tabs: [] };
+    const presets = [
+      { name: "kit-ui", plugins: [kit, plain] },
+      { name: "design", plugins: [figma] }
+    ];
+    expect(resolveConfig({ ...config, presets }, "/catalogue").plugins).toEqual([kit, plain, figma]);
+    expect(resolveConfig({ ...config, presets, plugins: [ownAcme] }, "/catalogue").plugins).toEqual([
+      kit,
+      figma,
+      ownAcme
+    ]);
+    expect(
+      resolveConfig({ ...config, presets, presetPlugins: { kit: false, figma: false } }, "/catalogue").plugins
+    ).toEqual([plain]);
+  });
+
+  it("stops at a preset's plugin left out that no preset brings, and at two presets bringing one", () => {
+    const presets = [{ name: "kit-ui", plugins: [plain] }];
+    expect(() =>
+      resolveConfig({ ...config, presets, presetPlugins: { acmee: false } }, "/catalogue")
+    ).toThrow('presetPlugins names "acmee", which no preset of this catalogue brings');
+    expect(() =>
+      resolveConfig({ ...config, presets: [...presets, { name: "other", plugins: [plain] }] }, "/catalogue")
+    ).toThrow('the plugin "acme" is given twice');
+  });
+
   it("stops at a problem, naming the configuration", () => {
     expect(() => resolveConfig({ ...config, plugins: [plain, plain] }, "/catalogue")).toThrow(
       `${resolve("/catalogue", "forgebook.config")}: the plugin "acme" is given twice`

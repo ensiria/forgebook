@@ -1,5 +1,6 @@
 /**
- * The probe's tab, written against the contract alone: no React, the element it is handed and its context.
+ * The probe's tab, written against the contract alone: no React, the element it is handed and its context. A button
+ * sends its frame module a value.
  *
  * @module
  */
@@ -15,11 +16,21 @@ export const view: PluginView<PluginTabContext> = (target, context) => {
   const line = target.ownerDocument.createElement("p");
   line.dataset["testid"] = "probe-tab";
   line.textContent = textOf(context);
-  target.replaceChildren(line);
+  // sends the frame module a value, which comes back in its next report
+  let sent = 0;
+  const send = target.ownerDocument.createElement("button");
+  send.type = "button";
+  send.className = "forgebook-button";
+  send.textContent = "Ping the frame";
+  send.addEventListener("click", () => {
+    sent += 1;
+    context.send?.({ ping: sent });
+  });
+  target.replaceChildren(line, send);
   return {
     update: (next): void => {
       line.textContent = textOf(next);
     },
-    unmount: (): void => line.remove()
+    unmount: (): void => target.replaceChildren()
   };
 };
