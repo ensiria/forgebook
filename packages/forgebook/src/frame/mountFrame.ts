@@ -61,6 +61,7 @@ import {
   STATUS_ATTRIBUTE
 } from "./frameStatus.ts";
 import { applyView, loadSheets, viewSheets } from "./frameView.ts";
+import { type ControlFrameLoaders, panelControls } from "./panelControls.ts";
 import { panelArgsOf, storyArgsOf } from "./panelValues.ts";
 import type { PlayToolsLoader } from "./playStory.ts";
 import { type FramePlugin, startPluginFrames } from "./pluginFrames.ts";
@@ -104,6 +105,8 @@ export type FrameConfig = {
   readonly plugins?: readonly FramePlugin[];
   /** Where the frames run, so the frame hears only its shell: on the catalogue's own origin by default. */
   readonly frames?: FramesPlacement;
+  /** The custom controls' frame modules, by control, each loaded when first needed (the generated frame passes them). */
+  readonly argControls?: ControlFrameLoaders;
 };
 
 /**
@@ -181,7 +184,7 @@ const failedToLoad = (message: string, fail: (reason: string) => void): void => 
 
 /**
  * Does what a message of the shell asks of the rendered story; the view's live part is applied apart, before the story
- * loads.
+ * loads, and so are the panel's values (`panelControls.ts`).
  *
  * @param message - the message.
  * @param controls - the rendered story's controls.
@@ -202,7 +205,6 @@ const answerShell = (
   tellShell: ShellChannel["tell"]
 ): void => {
   if (message.type === "forgebook:replay") void controls.replay();
-  else if (message.type === "forgebook:args") controls.setPanelArgs(message.args);
   else if (message.type === "forgebook:events") controls.setEvents(message.names);
   else if (message.type === "forgebook:matrix") controls.setMatrix(message.matrix ?? undefined);
   else if (message.type === "forgebook:play-step") controls.stepPlay(message.command);
@@ -402,10 +404,13 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
     // why the story was not seen in its final state: a check of what it shows would pass on a fallback
     let pendingReason: string | undefined;
     const clock = storyFrameClock(story.clockStart, isClockHeldIn(window.location.search));
-    shell.listen((message: ShellMessage): void => {
-      if (controls !== undefined)
-        answerShell(message, controls, storyId, pendingReason, catalogue.a11y, config.axeUrl, tellShell);
-    });
+    // the controls with a frame module, which turn the panel's values first; their docs name those given by type
+    const typed = panelControls(config.argControls, source, location.story.file, reportError);
+    shell.listen((message: ShellMessage): void =>
+      typed.take(message, { story, controls, tellReady }, (drawn: StoryControls) =>
+        answerShell(message, drawn, storyId, pendingReason, catalogue.a11y, config.axeUrl, tellShell)
+      )
+    );
     // the language's texts, and the switches the story reads (the language's provider reads its id among them); a
     // language the source gives as a loader is loaded as it is shown
     const shownFor = async (
@@ -430,7 +435,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
         storyId,
         canReplay: story.replay !== undefined,
         hasClock: story.clockStart !== undefined,
-        args,
+        args: typed.withOwn(args),
         textKeys: storyTextKeysOf(story.args),
         argTypes: panelArgTypesOf(story.argTypes, excludedControls(story.parameters["controls"])),
         controls: story.controls,
@@ -451,7 +456,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
       decorators: [...preview.decorators, ...plugins.decorators],
       ...shown,
       resolveArgs: (args: PanelArgs): Readonly<Record<string, unknown>> =>
-        storyArgsOf(args, source.namedValues),
+        typed.storyArgs(storyArgsOf(args, source.namedValues)),
       onControlsReady: (next: StoryControls, outcome: StoryOutcome): void => {
         controls = next;
         clearRetry(sessionStorageOf(window), window.location.href);
@@ -498,7 +503,7 @@ export const mountFrame = async (container: HTMLElement, config: FrameConfig): P
           details: values.map(detailOf)
         }),
       panelArgsOf: (values: Readonly<Record<string, unknown>>): PanelArgs =>
-        panelArgsOf(values, source.namedValues),
+        typed.panelArgs(values, panelArgsOf(values, source.namedValues)),
       onArgsChange: (args: PanelArgs): void => tellShell({ type: "forgebook:story-args", storyId, args })
     });
     // an edit of the story file, or of a file it re-exports stories from, draws the story anew in place: the reader keeps

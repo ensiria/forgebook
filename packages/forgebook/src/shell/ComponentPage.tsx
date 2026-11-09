@@ -4,8 +4,8 @@
  * example.
  *
  * @remarks
- * The frames load a few at a time (`useFrameQueue`), in the page's order, the demo first, each as it comes near the
- * visible part of the page: a component may have twenty stories. The view's live part reaches every frame as a message, as
+ * The frames load a few at a time (`useFrameQueue`), each as it comes near the visible part of the page, the nearest
+ * first and the demo first among those in view: a component may have a hundred stories. The view's live part reaches every frame as a message, as
  * on the story page; the props panel and Replay belong to a story's own page, which each story's name links to. The
  * documentation file's HTML is the package's own, made at build time (`vite/componentPage.ts`). Who reads the page
  * reorders and filters what goes around the frames (`audienceLayout.ts`); what only one audience wants loads on first use,
@@ -38,6 +38,7 @@ import { Example, type ExampleContext, type ExampleReading } from "./Example.tsx
 import { LATER_STRINGS } from "./laterStrings.ts";
 import { LazyView, lazyModule } from "./lazyModule.tsx";
 import { PackageHtml } from "./PackageHtml.tsx";
+import { usePageWidth } from "./PageWidth.tsx";
 import { PageTagView } from "./pageTagView.tsx";
 import type { TouchOverrides } from "./storyTouch.ts";
 import { UsedIn, type UsedInProps } from "./UsedIn.tsx";
@@ -85,8 +86,8 @@ export type ComponentPageProps = {
   readonly heightOf: (storyId: string) => number | undefined;
   /** The colour the stories' page has in the view (their source's), which each box waits on; none without one. */
   readonly background: string | undefined;
-  /** What stays above the page while it scrolls: the component's header. */
-  readonly header: ReactNode;
+  /** What stays above the page while it scrolls: the component's header, with the page's tools beside its picker. */
+  readonly headerWith: (tools: ReactNode) => ReactNode;
   /** Where its scrolling part starts: the shell's visit of the page and every page's last position. */
   readonly scroll: PageScroll;
   /** What "Used in" reads and opens; none when the catalogue turned it off. */
@@ -252,7 +253,7 @@ export const ComponentPage = ({
   loadPage,
   heightOf,
   background,
-  header,
+  headerWith,
   scroll,
   usedIn,
   onViewChange,
@@ -266,6 +267,7 @@ export const ComponentPage = ({
   const docs = useComponentDocs(loadDocs);
   const code = useStoryCode(loadCode);
   const page = usePageDoc(loadPage);
+  const pageWidth = usePageWidth();
   const demo = mainStory(component);
   const examples = useMemo(
     () => component.stories.filter((story) => story.id !== demo?.id),
@@ -343,7 +345,7 @@ export const ComponentPage = ({
 
   return (
     <div className="forgebook-workspace">
-      {header}
+      {headerWith(pageWidth.toggle)}
       {anchor === undefined ? null : (
         <Suspense fallback={null}>
           <AnchorScroll
@@ -360,6 +362,7 @@ export const ComponentPage = ({
           key={`${component.file}|${component.title}`}
           className="forgebook-doc"
           data-audience={view.audience === "everyone" ? undefined : view.audience}
+          data-page-width={pageWidth.width}
         >
           {hasTags ? <PageTagView place="page" component={component} loadDocs={loadDocs} /> : null}
           <AudienceSlot place="beforeDemo" audience={audienceProps}>

@@ -1,6 +1,6 @@
 /**
  * One prop of the Props tab as it is drawn: its head (its name, whether it is required, its group in the "Required"
- * group, its type), then its control, its toggle, or its description for reading.
+ * group, its type), then its control, or its description for reading.
  *
  * @module
  */
@@ -13,6 +13,7 @@ import type { ArgControlLoaders } from "./customControls.ts";
 import { Icon, type IconName } from "./icons.tsx";
 import { LazyView, lazyModule } from "./lazyModule.tsx";
 import { ChoiceControl, MOST_PLAIN_OPTIONS, NumberField, type OnValueChange, textOf } from "./PropFields.tsx";
+import { Switch } from "./Switch.tsx";
 import { STRINGS } from "./strings.ts";
 import type { PropEditorProps } from "./valueEditors/PropEditor.tsx";
 
@@ -184,7 +185,7 @@ const usesEditors = (prop: PanelProp, named: Readonly<Record<string, unknown>> |
     (prop.control === undefined || prop.control === "select") &&
     (prop.choices?.length ?? 0) > MOST_PLAIN_OPTIONS);
 
-/** One adjustable prop with its control. */
+/** One adjustable prop with its control: a boolean's is a switch. */
 export const PropControl = ({
   prop,
   showsGroup,
@@ -219,6 +220,22 @@ export const PropControl = ({
   const descriptionId = useId();
   const label = prop.label ?? prop.name;
   const state: FieldState = { value, panelValue, onValueChange };
+  if (prop.kind === "toggle") {
+    return (
+      <div className="forgebook-prop">
+        <PropHead prop={prop} showsGroup={showsGroup} state={state} />
+        <div className="forgebook-prop__field">
+          <Switch
+            label={label}
+            isOn={value === true}
+            describedBy={descriptionId}
+            onChange={(isOn: boolean): void => onValueChange(prop.name, isOn)}
+          />
+        </div>
+        <PropNote id={descriptionId} prop={prop} />
+      </div>
+    );
+  }
   if (usesEditors(prop, named)) {
     const editorProps: PropEditorProps = {
       prop,
@@ -311,47 +328,6 @@ export const PropControl = ({
       )}
       <PropNote id={descriptionId} prop={prop} />
     </div>
-  );
-};
-
-/** A toggle: its name in a compact checkbox, its description as the tooltip and for screen readers. */
-export const Toggle = ({
-  prop,
-  showsGroup,
-  value,
-  panelValue,
-  onValueChange
-}: {
-  readonly prop: PanelProp;
-  /** Whether it names its group: in the "Required" group. */
-  readonly showsGroup: boolean;
-  readonly value: ArgValue | undefined;
-  /** The panel's own value; none when the story's own is shown. */
-  readonly panelValue: ArgValue | undefined;
-  readonly onValueChange: OnValueChange;
-}): ReactNode => {
-  const descriptionId = useId();
-  return (
-    <span className="forgebook-toggle-row">
-      <label className="forgebook-toggle" title={prop.description}>
-        <input
-          type="checkbox"
-          aria-label={prop.label ?? prop.name}
-          checked={value === true}
-          aria-describedby={descriptionId}
-          onChange={(event: ChangeEvent<HTMLInputElement>): void =>
-            onValueChange(prop.name, event.target.checked)
-          }
-        />
-        <code>{prop.label ?? prop.name}</code>
-        <GroupName prop={prop} showsGroup={showsGroup} />
-        <span id={descriptionId} className="forgebook-visually-hidden">
-          {prop.description}
-        </span>
-      </label>
-      {isUnsetArg(panelValue) ? <span className="forgebook-prop__state">{STRINGS.stateUnset}</span> : null}
-      <FieldActions prop={prop} value={value} panelValue={panelValue} onValueChange={onValueChange} />
-    </span>
   );
 };
 

@@ -16,6 +16,7 @@
  * @module
  */
 import { existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, rmSync, symlinkSync } from "node:fs";
+import { rm } from "node:fs/promises";
 import { basename, dirname, join, relative, sep } from "node:path";
 
 import type { StoryCheckReport, StoryCheckResult, StoryProblem } from "../../src/storyCheck.ts";
@@ -78,6 +79,14 @@ const twinModules = (from: string, to: string, root: string, folder: string): vo
     else symlinkSync(linkTarget(entry, root, folder), join(to, name), "junction");
   }
 };
+
+/**
+ * How the base's folder is removed: tried again for a moment while it is still being written in. A server Vite closes
+ * while its first pre-bundle runs (a base with none of the stories asked for closes at once) cancels the run, but the
+ * bundler still writes its files into the cache folder inside, and the removal would fail on a folder not empty. The
+ * removal waits between tries without holding the process, so what is still writing can finish.
+ */
+const BASE_REMOVAL = { recursive: true, force: true, maxRetries: 10, retryDelay: 50 } as const;
 
 /** The prefix of the folders a base runs in, beside the repository. */
 const folderPrefix = (root: string): string => `.${basename(root)}-forgebook-base-`;
@@ -231,8 +240,8 @@ export const runOnBase = async (
     return error instanceof Error ? error.message : String(error);
   } finally {
     // the links go first, so nothing that removes the worktree can follow one into the working tree
-    for (const twin of twins) rmSync(twin, { recursive: true, force: true });
+    for (const twin of twins) await rm(twin, BASE_REMOVAL);
     await gitOutputIn(root, env, "worktree", "remove", "--force", folder).catch(() => undefined);
-    rmSync(folder, { recursive: true, force: true });
+    await rm(folder, BASE_REMOVAL);
   }
 };

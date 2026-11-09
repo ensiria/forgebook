@@ -28,7 +28,7 @@ import { canOrderRequired, laidOutProps, propGroupOrder } from "../propGroups.ts
 import { useCatalogue } from "./catalogueContext.ts";
 import type { ArgControlLoaders } from "./customControls.ts";
 import { Icon } from "./icons.tsx";
-import { PropControl, ReadOnlyProp, type TextArgNote, Toggle } from "./PropRows.tsx";
+import { PropControl, ReadOnlyProp, type TextArgNote } from "./PropRows.tsx";
 import { RequiredFirstSwitch } from "./RequiredFirstSwitch.tsx";
 import { STRINGS } from "./strings.ts";
 import { useRequiredFirst } from "./useRequiredFirst.ts";
@@ -196,19 +196,6 @@ export const PropsTab = ({
       onValueChange={onValueChange}
     />
   );
-  const field = (prop: PanelProp, showsGroup: boolean): ReactNode =>
-    prop.kind === "toggle" ? (
-      <Toggle
-        key={prop.name}
-        prop={prop}
-        showsGroup={showsGroup}
-        value={values[prop.name]}
-        panelValue={panelArgs[prop.name]}
-        onValueChange={onValueChange}
-      />
-    ) : (
-      control(prop, showsGroup)
-    );
   const others = ungrouped.filter((prop) => !isSettable(prop));
   const hasControls = controls === "all" || controls.length > 0;
   return (
@@ -224,13 +211,13 @@ export const PropsTab = ({
           name={STRINGS.required}
           props={required}
           isSettable={isSettable}
-          field={field}
+          field={control}
           isRequired={true}
         />
       )}
       {settable.length === 0 ? null : (
         <div className="forgebook-prop-group">
-          <div className="forgebook-prop-grid">{settable.map((prop) => field(prop, false))}</div>
+          <div className="forgebook-prop-grid">{settable.map((prop) => control(prop, false))}</div>
         </div>
       )}
       {others.length === 0 ? null : (
@@ -252,7 +239,7 @@ export const PropsTab = ({
             name={group.name}
             props={group.props}
             isSettable={isSettable}
-            field={field}
+            field={control}
           />
         )
       )}

@@ -31,6 +31,19 @@ export type StoryProblem = {
   readonly message: string;
 };
 
+/**
+ * Something a check found that does not fail the story: a static file it asks for (an image, a font) that answers 404.
+ * The story still runs and a person sees what is missing, so it is said, not counted.
+ */
+export type StoryWarning = {
+  /** What it is. */
+  readonly kind: "missing-file";
+  /** The file's path, with its query: the same in every run. */
+  readonly path: string;
+  /** What it means, in a sentence. */
+  readonly message: string;
+};
+
 /** A story to check: its id, and the height its scene declares. */
 export type StoryCheckStory = {
   /** The story's id. */
@@ -98,6 +111,8 @@ export type StoryCheckResult = {
   readonly frame: string;
   /** The problems; none when it passes. */
   readonly problems: readonly StoryProblem[];
+  /** What was found that does not fail it: its missing static files. Absent when there is none. */
+  readonly warnings?: readonly StoryWarning[];
   /**
    * Why the story's checks did not run: its frame gave up waiting for what it loads, or cannot tell (status `pending`),
    * so no check saw the story in its final state. Absent when they ran; present, the story has not passed, whatever
@@ -226,6 +241,21 @@ const isProblem = (value: unknown): value is StoryProblem =>
   typeof value.message === "string";
 
 /**
+ * Whether a value is a warning.
+ *
+ * @param value - the value.
+ */
+const isWarning = (value: unknown): value is StoryWarning =>
+  typeof value === "object" &&
+  value !== null &&
+  "kind" in value &&
+  value.kind === "missing-file" &&
+  "path" in value &&
+  typeof value.path === "string" &&
+  "message" in value &&
+  typeof value.message === "string";
+
+/**
  * Whether a value is a result.
  *
  * @param value - the value.
@@ -242,6 +272,9 @@ const isResult = (value: unknown): value is StoryCheckResult =>
   "problems" in value &&
   Array.isArray(value.problems) &&
   value.problems.every(isProblem) &&
+  (!("warnings" in value) ||
+    value.warnings === undefined ||
+    (Array.isArray(value.warnings) && value.warnings.every(isWarning))) &&
   (!("notVerified" in value) || value.notVerified === undefined || typeof value.notVerified === "string") &&
   (!("isNotAwaited" in value) || value.isNotAwaited === undefined || typeof value.isNotAwaited === "boolean");
 

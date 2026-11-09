@@ -100,6 +100,7 @@ test.describe("custom controls", () => {
     page.on("request", (request) => requests.push(request.url()));
     await page.goto("/?story=sb:storybook-value-props--filled");
     await expect(page.getByRole("button", { name: "Add to tags" })).toBeVisible();
-    expect(requests.filter((url) => /controls\/|CustomControl|customControls/.test(url))).toEqual([]);
+    // the catalogue's own controls' folder, not a checkout's folder whose name ends in "controls"
+    expect(requests.filter((url) => /\/controls\/|CustomControl|customControls/.test(url))).toEqual([]);
   });
 });

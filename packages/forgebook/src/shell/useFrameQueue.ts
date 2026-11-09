@@ -1,15 +1,23 @@
 /**
- * Which frames of a page of many stories may load: those near the visible part of the page, a few at a time, so the
- * browser is never asked for thousands of modules at once.
+ * Which frames of a page of many stories may load: those near the visible part of the page, nearest first, a few at a
+ * time, so the browser is never asked for thousands of modules at once.
  *
  * @remarks
  * In development every frame loads its sources' modules one by one (a few hundred requests); twenty frames at once
  * exhaust the browser ("insufficient resources") and stories stay blank. A frame loads once its story is near the
  * visible part of the scrolling page and fewer than `MAX_LOADING` frames are still loading; once loaded it stays.
  *
+ * The reader may be anywhere on the page, so a free place goes to the waiting story nearest the visible part, not to
+ * the first one in the page's order (`frameOrder.ts`); and no frame starts while the page scrolls fast
+ * (`useScrollSettled.ts`), so the stories a scroll flies past never hold a place the stories where it stops need. A
+ * frame already loading finishes wherever the page goes.
+ *
  * @module
  */
 import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
+
+import { distanceFromView, nearestFrames } from "./frameOrder.ts";
+import { useScrollSettled } from "./useScrollSettled.ts";
 
 /** The most frames loading at once. */
 const MAX_LOADING = 2;
@@ -28,8 +36,30 @@ export type FrameQueue = {
   readonly observerOf: (storyId: string, place?: number) => (element: HTMLElement | null) => void;
   /** Records a story whose frame finished loading. */
   readonly markReady: (storyId: string) => void;
-  /** Loads every frame of the page, wherever it is, still a few at a time. */
+  /** Loads every frame of the page, wherever it is, still a few at a time and nearest first. */
   readonly loadAll: () => void;
+};
+
+/**
+ * How far each waiting story is from the visible part of the page: its nearest place, for a story shown twice.
+ *
+ * @param waiting - the stories waiting for their frame.
+ * @param elements - the elements that hold the page's frames, with their story.
+ * @param root - the element that scrolls the page; the window when there is none.
+ */
+const distancesOf = (
+  waiting: ReadonlySet<string>,
+  elements: ReadonlyMap<Element, string>,
+  root: HTMLElement | null
+): Map<string, number> => {
+  const view = root?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
+  const distances = new Map<string, number>();
+  for (const [element, storyId] of elements) {
+    if (!waiting.has(storyId)) continue;
+    const distance = distanceFromView(element.getBoundingClientRect(), view);
+    distances.set(storyId, Math.min(distance, distances.get(storyId) ?? distance));
+  }
+  return distances;
 };
 
 /**
@@ -51,6 +81,7 @@ export const useFrameQueue = (
   const observerRef = useRef<IntersectionObserver | undefined>(undefined);
   const elements = useRef(new Map<Element, string>());
   const observers = useRef(new Map<string, (element: HTMLElement | null) => void>());
+  const isSettled = useScrollSettled(root);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -70,17 +101,18 @@ export const useFrameQueue = (
     return (): void => observer.disconnect();
   }, [root]);
 
-  // a few more frames whenever a story comes near or a frame finishes loading; a frame the page no longer lists never
-  // finishes, and must not hold a place
+  // a few more frames whenever a story comes near, a frame finishes loading or the page stops flying; a frame the page
+  // no longer lists never finishes, and must not hold a place
   useEffect(() => {
-    setMounted((current) => {
-      const nearIds = new Set([...near].map((element) => elements.current.get(element)));
-      const loading = [...current].filter((id) => storyIds.includes(id) && !ready.has(id)).length;
-      const waiting = storyIds.filter((id) => (isEveryStoryNear || nearIds.has(id)) && !current.has(id));
-      const next = waiting.slice(0, Math.max(0, MAX_LOADING - loading));
-      return next.length === 0 ? current : new Set([...current, ...next]);
-    });
-  }, [storyIds, near, ready, isEveryStoryNear]);
+    if (!isSettled) return;
+    const free = MAX_LOADING - [...mounted].filter((id) => storyIds.includes(id) && !ready.has(id)).length;
+    if (free <= 0) return;
+    const nearIds = new Set([...near].map((element) => elements.current.get(element)));
+    const waiting = storyIds.filter((id) => (isEveryStoryNear || nearIds.has(id)) && !mounted.has(id));
+    if (waiting.length === 0) return;
+    const next = nearestFrames(waiting, distancesOf(new Set(waiting), elements.current, root.current), free);
+    setMounted(new Set([...mounted, ...next]));
+  }, [storyIds, near, ready, isEveryStoryNear, isSettled, mounted, root]);
 
   const observerOf = useCallback((storyId: string, place = 0) => {
     const key = `${storyId}\n${place}`;

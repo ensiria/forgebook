@@ -21,6 +21,8 @@ export type StoryPickerProps = {
   readonly onOpenComponent: () => void;
   /** Opens a story's page. */
   readonly onOpenStory: (story: TreeStory) => void;
+  /** What sits beside the select, at the header's end: the page width's button. */
+  readonly children?: ReactNode;
 };
 
 /** The value of the option that opens the component's page: no story id is empty. */
@@ -29,13 +31,14 @@ const ALL = "";
 /**
  * The picker of a component's stories.
  *
- * @param props - the component, the shown story and how to open a page.
+ * @param props - the component, the shown story, how to open a page, and what sits beside the select.
  */
 export const StoryPicker = ({
   component,
   currentStoryId,
   onOpenComponent,
-  onOpenStory
+  onOpenStory,
+  children
 }: StoryPickerProps): ReactNode => {
   const id = useId();
   const { storyGroups } = useCatalogue();
@@ -77,6 +80,7 @@ export const StoryPicker = ({
           )
         )}
       </select>
+      {children}
     </div>
   );
 };

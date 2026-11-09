@@ -44,7 +44,8 @@ const isControlModule = (value: unknown): value is ArgControlModule =>
   "mount" in value &&
   typeof value.mount === "function" &&
   "schema" in value &&
-  isValueSchema(value.schema);
+  isValueSchema(value.schema) &&
+  (!("toCode" in value) || value.toCode === undefined || typeof value.toCode === "function");
 
 /** Each control's load, kept: every field and check of a page share one. */
 const loads = new Map<() => Promise<unknown>, Promise<LoadedControl>>();
@@ -107,6 +108,24 @@ export const customChecksOf = async (
       control.status === "ready"
         ? [[name, (value: ArgValue): string | undefined => controlValueProblem(control.module, value)]]
         : []
+    )
+  );
+};
+
+/**
+ * A control's texts as the catalogue words them: its `strings` under `argControls.<name>.`, by the rest of the key.
+ *
+ * @param strings - the catalogue's replaced texts.
+ * @param name - the control's name.
+ */
+export const controlStringsOf = (
+  strings: Readonly<Record<string, string>>,
+  name: string
+): Readonly<Record<string, string>> => {
+  const prefix = `argControls.${name}.`;
+  return Object.fromEntries(
+    Object.entries(strings).flatMap(([key, text]): [string, string][] =>
+      key.startsWith(prefix) && key.length > prefix.length ? [[key.slice(prefix.length), text]] : []
     )
   );
 };

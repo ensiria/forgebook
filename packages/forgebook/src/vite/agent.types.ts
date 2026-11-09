@@ -18,7 +18,7 @@ import type { LiveError } from "../liveErrors.ts";
 import type { PluginCondition } from "../plugin.ts";
 import type { SearchHitKind, SearchReason, SearchResult } from "../search.ts";
 import type { SearchCorrection } from "../searchTypos.ts";
-import type { StoryCheckResult, StoryDiffStatus } from "../storyCheck.ts";
+import type { StoryCheckResult, StoryDiffStatus, StoryWarning } from "../storyCheck.ts";
 import type { SetArgs, StoryControl } from "../storyControls.ts";
 import type { SwitchControlKind, SwitchPreview, SwitchRole } from "../switches.ts";
 import type { CodeAdvice, CodeProblem, CodeRule, ExcusedValue } from "./checkCode.ts";
@@ -509,6 +509,12 @@ export type VerifyFailure = {
   readonly links?: StoryLinks;
 };
 
+/** A static file the change's stories asked for that is not there: said, never counted against the change. */
+export type VerifyWarning = StoryWarning & {
+  /** The stories that asked for it, each once. */
+  readonly stories: readonly string[];
+};
+
 /** The one answer to whether a change is verified. */
 export type VerifyDocument = {
   /** The shape's version: this shape is not the first `verify` answered. */
@@ -539,6 +545,8 @@ export type VerifyDocument = {
   readonly failures: readonly VerifyFailure[];
   /** The pairs no check saw in their final state: their frame gave up on what the story loads. None of them passed. */
   readonly notVerified: readonly VerifyNotVerified[];
+  /** What the stories found that does not fail the change, one per file: static files that answer 404. */
+  readonly warnings: readonly VerifyWarning[];
   /** What the change adds, by `check-code`. */
   readonly code: {
     /** What was checked. */

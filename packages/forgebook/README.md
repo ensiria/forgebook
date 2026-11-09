@@ -252,6 +252,9 @@ too, with a warning.
   them and hides the rest in the View menu; their browser keeps it ([below](#the-toolbar)).
 - **A light and a dark catalogue**: the reader picks Light, Dark or System in the Interface menu at the sidebar's foot
   (their browser keeps it); `appearance` in the configuration sets the default. The stories keep their own theme, from the view's switches.
+- **Contained or full width**: the button beside the Stories picker, and at the top of the home, sets the home and a
+  component's page in a centred column (pressed, the default) or across the whole width; their browser keeps it. A
+  docs page keeps its reading column, and a story's page its own width controls.
 - **Keys and named views**: `?` lists the keys, as does the menu at the sidebar's foot, where a reader can turn off every
   key without a modifier for this browser; a key pressed inside a story, in a text field or in a custom element stays
   theirs. A key cycles a control's values (`t` the theme, Shift+`t` back); the catalogue sets the
@@ -727,8 +730,9 @@ The editors are one chunk that loads when the first such prop is drawn: a catalo
 
 ### Controls of your own
 
-A control the panel lacks is a module of yours, registered by name and loaded when a story names it. A catalogue that
-registers none loads nothing for this.
+A control the panel lacks is a module of yours, registered by name and loaded when a story names it, or a prop it
+matches by type is shown ([below](#controls-by-type-and-from-a-librarys-preset)). A catalogue that registers none loads
+nothing for this.
 
 ```ts
 // forgebook.config.ts
@@ -752,7 +756,7 @@ export const mount = (element: HTMLElement, props: ArgControlProps) => {
 };
 ```
 
-`mount(element, { value, onChange, argType })` draws in the element and returns what takes it away. It is a function rather
+`mount(element, { value, onChange, argType, strings })` draws in the element and returns what takes it away. It is a function rather
 than a component, so it can be written in any framework, whatever the stories' is: `createApp` in Vue, `mount` in Svelte,
 plain DOM. `argType` holds the arg's `name`, `label` and `description`, and the control's `options`, `min`, `max`, `step`
 and `settings`. The control keeps what it draws: it is mounted again only when the value changes from outside it.
@@ -774,6 +778,77 @@ unlike a story, it has no origin of its own to keep it apart. Register only code
 agents its module also loads on the dev server when a command asks about a story that names it, for its `schema`: keep what
 touches the page inside `mount`. A name that no control has (`control: "selct"`) is read as a custom control, and says so
 beside the field.
+
+### Controls by type, and from a library's preset
+
+A control can take a prop in every story without any story naming it: by the prop's type, its name, or both. A library
+registers its controls in its preset, so every catalogue that lists the preset gets them, with no `argTypes` to write:
+
+```ts
+// the library's preset (its `./forgebook` export)
+export const acmePreset = (): ForgebookPreset =>
+  definePreset({
+    name: "acme-ui",
+    argControls: {
+      icon: {
+        module: "@acme/ui/forgebook/icon-picker", // mount and schema, drawn in the panel
+        frame: "@acme/ui/forgebook/icon-value", // toStoryValue, run in the story's frame
+        matches: { typeName: "IconComponent" }
+      }
+    },
+    strings: { "argControls.icon.none": "No icon" }
+  });
+```
+
+```ts
+// @acme/ui/forgebook/icon-value
+import type { ArgControlFrameModule } from "forgebook/arg-control";
+import { ICONS } from "../src/icons";
+
+export const toStoryValue: ArgControlFrameModule["toStoryValue"] = (name) =>
+  typeof name === "string" && Object.hasOwn(ICONS, name) ? ICONS[name] : undefined;
+
+// optional: the story's own icon named back, so the picker shows what the story draws
+export const toPanelValue: ArgControlFrameModule["toPanelValue"] = (icon) =>
+  Object.entries(ICONS).find(([, each]) => each === icon)?.[0];
+```
+
+- **What matches.** `matches` is one `{ typeName, propName }` or a list of them; each field given must hold. `typeName`
+  is the type as the props are read: as the source writes it (`IconComponent`), or any alias it is declared through
+  (`type ChipIcon = IconComponent`), an import's new name, with `undefined` and `null` left out, so `icon?: IconComponent`
+  and `icon?: IconComponent | undefined` match; a union matches only when every member goes by the name. `forgebook story
+  --json` writes the names a prop's type goes by as `typeNames` when they are more than its `type`. An event never
+  matches.
+- **Which control wins.** A control a story's `argTypes` name for the prop wins over any match; a `description` or a
+  `label` alone keeps the matched control. Among controls that match, one that names the prop wins over one that names
+  only its type, then the catalogue's own before its presets', each in the order written. Only props the component has
+  get a control: no story gains a prop.
+- **The value.** The panel, a link and an agent keep the control's JSON value (`"IconSearch"`), checked against its
+  `schema`. A `frame` module turns it into what the story receives, in the frame, with `toStoryValue(value, { name,
+  settings })`; a value it cannot turn, or a module that fails, leaves the story its own value and says why. Without a
+  `frame` module the story receives the JSON value. `toPanelValue`, optional, names a value the story gives itself.
+- **Its code.** The Code tab and `forgebook story` write a value as the story receives it when the control's module
+  exports `toCode(value, argType)`, the expression the attribute holds: `toCode: (name) => name` writes
+  `icon={IconStar}`, not `icon="IconStar"`. Without it, or for a value it gives `undefined`, the JSON value is written;
+  the story file's own code for an arg stays as written until the panel sets it. It runs in the page and on the dev
+  server.
+- **When it loads.** The module loads when the panel first shows a prop it takes, the frame module when a story's frame
+  is first given a value of it: neither on the catalogue's first load. A frame reads its story's component docs, to
+  know which props a control takes, only once a module may have work: the panel gives a value, the story's `argTypes`
+  name a control with a frame module, or the story gives itself a value plain data cannot show (an icon to name back).
+  A story of plain values that nobody edits loads neither.
+- **Texts.** A control receives `strings` (always given; optional in the type, so its own tests need not build it): the
+  catalogue's `strings` whose key starts with `argControls.<name>.`, by the rest of the key. A preset words its control
+  there, and the catalogue's own `strings` replace a preset's.
+- **The catalogue decides.** Its registration of a name replaces a preset's, and `argControls: { icon: false }` removes
+  it (a name no preset registers is an error, so a typo is not silent). A preset names its modules by absolute path or a
+  package's specifier, as its preview; no module is an address (`https:`, `data:`). A preset cannot take every prop of a
+  keyword type (`{ typeName: "string" }`) without a `propName`.
+
+**A preset's control runs in the catalogue's page, with a plugin's trust**, as the catalogue's own do. A preset is
+already code the catalogue runs on Node (its configuration calls it, and the dev server loads a control's module for
+its `schema`); what changes is that its control also runs in the page. Its frame module runs in the stories' frames, as
+its preview does.
 
 ## Docs pages
 
@@ -1629,6 +1704,11 @@ its `frame-src`, in the preview's `frameDomains`).
 - **`server.fs.deny` wins over your globs.** A file it refuses stays out of the catalogue, its search and "Used in", with
   a warning. A file your globs name outside `server.fs.allow` is listed and served, as Vite serves any file a module of
   the project imports.
+- **A missing file is a 404, never your app's page.** The catalogue's two pages are its own, so the dev server has no
+  single-page fallback: a story's image under a path nothing serves answers 404, and the checks list it among their
+  warnings by its path, without failing.
+  Your app's `index.html` is never served, so its entry and every package it reaches stay unloaded. A Vite configuration
+  of your own that runs the plugin and sets `appType` keeps it.
 
 A command, an agent or `curl` sends no browser headers: `forgebook mcp`, `forgebook stories` and the agent API
 (`/__forgebook/api/`) work as usual, and anyone who can reach the port can use them. With `--host` that means your whole

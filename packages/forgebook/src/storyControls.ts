@@ -19,6 +19,7 @@ import {
   type TokenRequest
 } from "./argTypes.ts";
 import type { PropDocs } from "./componentDocs.ts";
+import type { ControlCoders } from "./controlCode.ts";
 import { type ArgValue, type PanelArgs, panelArgsParam } from "./messages.ts";
 import type { NamedValues } from "./namedValues.ts";
 import { holdsUnsafePart, isFileList, isValueOfShape, resolvedShape } from "./shapeValues.ts";
@@ -182,6 +183,8 @@ export const checkedSetArgs = (
 export type CustomControlsRead = {
   /** The schemas, by control. */
   readonly schemas: CustomSchemas;
+  /** What writes each control's values as code, by control, those whose module could be read. */
+  readonly coders: ControlCoders;
   /** Why a control could not be read, by control. */
   readonly problems: Readonly<Record<string, string>>;
 };

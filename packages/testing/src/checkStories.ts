@@ -27,6 +27,7 @@ import {
   errorProblems,
   focusProblems,
   isPageBlank,
+  missingFileWarnings,
   overlayProblems,
   spillProblems,
   watchedErrors
@@ -55,27 +56,29 @@ const checkedPage = async (
   a11y: A11ySettings | undefined,
   semantic: SemanticModel | undefined
 ): Promise<StoryCheckResult> => {
-  const errors = watchedErrors(page);
+  const watched = watchedErrors(page);
   const status = await openedStory(page, storyPage);
+  // read when the result is made: every response the page waited for has come by then
   const result = (problems: readonly StoryProblem[]): StoryCheckResult => ({
     storyId: storyPage.story.id,
     view: storyPage.name,
     frame: storyPage.frame,
-    problems
+    problems,
+    ...missingFileWarnings(watched())
   });
   if (status === "silent")
     return result([
       { kind: "frame", message: `The frame did not say it was ready in ${READY_MS / 1000} s` },
-      ...errorProblems(errors)
+      ...errorProblems(watched())
     ]);
   if (status === "error")
     return result([
       { kind: "frame", message: couldNotBeShown(await frameErrorOf(page), storyPage.story.file) },
-      ...errorProblems(errors)
+      ...errorProblems(watched())
     ]);
   // what it shows now is not the story: a check of it would pass on a fallback, so none runs, and no pass is claimed
   if (status === "pending")
-    return { ...result(errorProblems(errors)), notVerified: await pendingReasonOf(page) };
+    return { ...result(errorProblems(watched())), notVerified: await pendingReasonOf(page) };
   // a story about logic gets the suite's checks of a scene, not those about looks (`storyTestPlan.ts`)
   const lookProblems = hasLookChecks(storyPage.story)
     ? [
@@ -88,7 +91,7 @@ const checkedPage = async (
   const isNotAwaited = (await page.locator("html").getAttribute(NOT_AWAITED_ATTRIBUTE)) !== null;
   const isBlank = await page.evaluate(isPageBlank);
   const checked = {
-    ...result([...axe, ...lookProblems, ...(await focusProblems(page)), ...errorProblems(errors)]),
+    ...result([...axe, ...lookProblems, ...(await focusProblems(page)), ...errorProblems(watched())]),
     ...(isNotAwaited ? { isNotAwaited } : {}),
     ...(isBlank ? { isBlank } : {})
   };

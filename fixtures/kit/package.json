@@ -10,7 +10,9 @@
     "./kit.css": "./src/kit.scss",
     "./stories": "./stories.ts",
     "./package.json": "./package.json",
-    "./forgebook": "./forgebook.ts"
+    "./forgebook": "./forgebook.ts",
+    "./forgebook/icon-picker": "./forgebook/iconPicker.tsx",
+    "./forgebook/icon-value": "./forgebook/iconValue.ts"
   },
   "dependencies": {
     "@forgebook/react": "workspace:*",

@@ -14,23 +14,126 @@ import { AxeBuilder } from "@axe-core/playwright";
 import type { Page } from "@playwright/test";
 import type { A11ySettings } from "forgebook/catalogue";
 import { findSpills } from "forgebook/spills";
-import type { StoryProblem } from "forgebook/story-check";
+import type { StoryProblem, StoryWarning } from "forgebook/story-check";
 
 import { findOverlaysPastFrame } from "./overlays.ts";
 
+/** How Chromium's console begins the error for a file the page could not load, whose text names no file. */
+const LOAD_FAILURE = "Failed to load resource";
+
 /**
- * The page's errors from now on: uncaught ones and the console's, in the order they come.
+ * The kinds of request (Playwright's `resourceType`) that fetch a static file, drawn or applied as it is: never a module,
+ * a script, a page or data the story's code reads.
+ */
+const STATIC_FILE_TYPES: ReadonlySet<string> = new Set([
+  "image",
+  "media",
+  "font",
+  "stylesheet",
+  "texttrack",
+  "manifest"
+]);
+
+/**
+ * Whether a response is a static file that is not there: a story's missing image or font is a warning, not a failure,
+ * since the story still runs and a person sees what is missing. A module, a script or data that answers 404 stops the
+ * code that asked for it, and stays an error.
+ *
+ * @param resourceType - the request's kind, as Playwright names it.
+ * @param status - the response's status.
+ */
+export const isMissingStaticFile = (resourceType: string, status: number): boolean =>
+  status === 404 && STATIC_FILE_TYPES.has(resourceType);
+
+/**
+ * An address as a problem names it: its path and query, the same in every run whatever port the server took.
+ *
+ * @param address - the address; returned as it is when it is not one.
+ */
+const pathOf = (address: string): string => {
+  try {
+    const url = new URL(address);
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return address;
+  }
+};
+
+/**
+ * A console error as a problem reads it: a file the page could not load is named by its path, which the console gives
+ * apart from the text, so the problem says which file it is.
+ *
+ * @param text - the console message's text.
+ * @param location - the address the console gives for it; empty when none.
+ */
+export const consoleErrorText = (text: string, location: string): string =>
+  !text.startsWith(LOAD_FAILURE) || location === "" ? text : `${text}: ${pathOf(location)}`;
+
+/** An error the page raised, as it came: uncaught (`page`) or written to the console, with the address it names. */
+export type PageError = {
+  /** Where it came from. */
+  readonly source: "page" | "console";
+  /** Its text. */
+  readonly text: string;
+  /** The address the console gives for it; empty for an uncaught error or when none. */
+  readonly location: string;
+};
+
+/** A page's errors, and the static files it asked for that are not there. */
+export type PageFindings = {
+  /** The errors that fail a story, in the order they came. */
+  readonly errors: string[];
+  /** The paths of the static files that answered 404, each once, in the order they came: warnings. */
+  readonly missingFiles: string[];
+};
+
+/**
+ * A page's errors split from its missing static files: the console's error for a file that is missing is the warning's,
+ * and leaves the errors.
+ *
+ * @param errors - the errors, as they came.
+ * @param missing - the addresses of the static files that answered 404, as they came.
+ */
+export const pageFindings = (errors: readonly PageError[], missing: readonly string[]): PageFindings => {
+  const missingSet = new Set(missing);
+  return {
+    errors: errors
+      .filter(
+        (error) =>
+          !(
+            error.source === "console" &&
+            error.text.startsWith(LOAD_FAILURE) &&
+            missingSet.has(error.location)
+          )
+      )
+      .map((error) =>
+        error.source === "console" ? consoleErrorText(error.text, error.location) : error.text
+      ),
+    missingFiles: [...new Set(missing.map(pathOf))]
+  };
+};
+
+/**
+ * Watches a page from now on: its uncaught errors, its console's, and the static files it asks for that are not there.
+ * Read once the story is shown, when every response has come, as the console may say a file failed before its response
+ * is seen.
  *
  * @param page - the page, before it opens the story.
- * @returns the list the errors are added to.
+ * @returns what was found so far, each time it is called.
  */
-export const watchedErrors = (page: Page): string[] => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
+export const watchedErrors = (page: Page): (() => PageFindings) => {
+  const errors: PageError[] = [];
+  const missing: string[] = [];
+  page.on("pageerror", (error) => errors.push({ source: "page", text: error.message, location: "" }));
   page.on("console", (message) => {
-    if (message.type() === "error") errors.push(message.text());
+    if (message.type() === "error")
+      errors.push({ source: "console", text: message.text(), location: message.location().url });
   });
-  return errors;
+  page.on("response", (response) => {
+    if (isMissingStaticFile(response.request().resourceType(), response.status()))
+      missing.push(response.url());
+  });
+  return () => pageFindings(errors, missing);
 };
 
 /**
@@ -145,10 +248,29 @@ export const focusProblems = async (page: Page): Promise<StoryProblem[]> => {
 /**
  * The page's errors as problems.
  *
- * @param errors - the errors `watchedErrors` collected.
+ * @param findings - what `watchedErrors` found.
  */
-export const errorProblems = (errors: readonly string[]): StoryProblem[] =>
-  errors.map((message) => ({ kind: "error", message }));
+export const errorProblems = (findings: PageFindings): StoryProblem[] =>
+  findings.errors.map((message) => ({ kind: "error", message }));
+
+/**
+ * The page's missing static files as warnings, for a result: none when there are none, so a result without any keeps its
+ * shape.
+ *
+ * @param findings - what `watchedErrors` found.
+ */
+export const missingFileWarnings = (findings: PageFindings): { warnings?: StoryWarning[] } =>
+  findings.missingFiles.length === 0
+    ? {}
+    : {
+        warnings: findings.missingFiles.map(
+          (path): StoryWarning => ({
+            kind: "missing-file",
+            path,
+            message: `${path} is not there (404): the story runs without it`
+          })
+        )
+      };
 
 /**
  * Whether a story's page shows nothing a reader could see: no text, and no element with a size that shows something of its

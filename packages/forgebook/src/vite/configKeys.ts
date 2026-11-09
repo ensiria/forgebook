@@ -87,7 +87,8 @@ const PRESET_KEYS: KeysOf<ForgebookPreset> = {
   languages: true,
   preview: true,
   head: true,
-  shell: true
+  shell: true,
+  argControls: true
 };
 
 const BUILD_KEYS: KeysOf<BuildOptions> = { readableNames: true };

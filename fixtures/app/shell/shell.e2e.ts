@@ -1567,7 +1567,7 @@ test.describe("the panel", () => {
     const behaviour = tab.locator(".forgebook-fold").filter({ hasText: "Behaviour" });
     await expect(tab.locator(".forgebook-fold[open]")).toHaveCount(3);
     await expect(behaviour.getByRole("spinbutton", { name: "rows" })).toBeVisible();
-    await behaviour.getByRole("checkbox", { name: "isDisabled" }).check();
+    await behaviour.getByRole("switch", { name: "isDisabled" }).check();
     await expect(frameOf(page).locator("select")).toBeDisabled();
   });
 

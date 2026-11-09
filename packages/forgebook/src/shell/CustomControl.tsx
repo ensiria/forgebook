@@ -8,14 +8,17 @@
  *
  * @module
  */
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ArgControlModule, ControlArgType } from "../argControl.ts";
 import type { PanelProp } from "../argTypes.ts";
+import { controlArgTypeOf } from "../controlCode.ts";
 import { type ArgValue, isArgValue, UNSET_ARG } from "../messages.ts";
+import { useCatalogue } from "./catalogueContext.ts";
 import {
   type ArgControlLoaders,
   CONTROL_STRINGS,
+  controlStringsOf,
   controlValueProblem,
   loadControl
 } from "./customControls.ts";
@@ -35,19 +38,6 @@ export type CustomControlProps = {
   readonly onValueChange: OnValueChange;
 };
 
-/** What a control is told of its arg. */
-const argTypeOf = (prop: PanelProp): ControlArgType => ({
-  name: prop.name,
-  label: prop.label ?? prop.name,
-  description: prop.description,
-  ...(prop.choices === undefined ? {} : { options: prop.choices }),
-  ...(prop.min === undefined ? {} : { min: prop.min }),
-  ...(prop.max === undefined ? {} : { max: prop.max }),
-  ...(prop.step === undefined ? {} : { step: prop.step }),
-  // the frame's word, read here since only a control needs it: what is no plain data never reaches a control
-  ...(prop.settings === undefined || !isArgValue(prop.settings) ? {} : { settings: prop.settings })
-});
-
 /** The value as text, to tell whether it is still the one the control gave. */
 const textOf = (value: ArgValue | undefined): string => JSON.stringify(value) ?? "";
 
@@ -61,6 +51,8 @@ type ControlRoomProps = {
   readonly value: ArgValue | undefined;
   /** What the story says of the arg. */
   readonly argType: ControlArgType;
+  /** Its texts as the catalogue words them. */
+  readonly strings: Readonly<Record<string, string>>;
   /** Takes a value it gave, once it passed. */
   readonly onAccepted: (value: ArgValue | undefined) => void;
   /** Says what went wrong; none takes it back. */
@@ -88,16 +80,17 @@ const ControlRoom = ({
   name,
   value,
   argType,
+  strings,
   onAccepted,
   onProblem
 }: ControlRoomProps): ReactNode => {
   const element = useRef<HTMLDivElement>(null);
-  const start = useRef({ value, argType, onAccepted, onProblem });
-  start.current = { value, argType, onAccepted, onProblem };
+  const start = useRef({ value, argType, strings, onAccepted, onProblem });
+  start.current = { value, argType, strings, onAccepted, onProblem };
   useEffect(() => {
     const host = element.current;
     if (host === null) return;
-    const { value: shown, argType: told, onProblem: say } = start.current;
+    const { value: shown, argType: told, strings: words, onProblem: say } = start.current;
     const refusal = shown === undefined ? undefined : controlValueProblem(module, shown);
     say(refusal === undefined ? undefined : CONTROL_STRINGS.controlValue(name, refusal));
     let isMounted = true;
@@ -116,7 +109,8 @@ const ControlRoom = ({
             start.current.onAccepted(change.value);
           }
         },
-        argType: told
+        argType: told,
+        strings: words
       });
     } catch (error) {
       say(CONTROL_STRINGS.controlThrew(name, error instanceof Error ? error.message : String(error)));
@@ -152,7 +146,9 @@ const MountedControl = ({
     given.current = textOf(value);
     setMounts(mounts + 1);
   }
-  const argType = argTypeOf(prop);
+  const argType = controlArgTypeOf(prop);
+  const { strings: catalogueStrings } = useCatalogue();
+  const strings = useMemo(() => controlStringsOf(catalogueStrings, name), [catalogueStrings, name]);
   return (
     <>
       <ControlRoom
@@ -161,6 +157,7 @@ const MountedControl = ({
         name={name}
         value={value}
         argType={argType}
+        strings={strings}
         onProblem={setProblem}
         onAccepted={(next: ArgValue | undefined): void => {
           given.current = textOf(next);

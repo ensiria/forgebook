@@ -430,7 +430,24 @@ describe("the generated modules' paths on Windows", () => {
 describe("the custom controls in the shell's entry", () => {
   it("are imported on use, and are nothing for a catalogue with none", () => {
     expect(shellEntry(CONFIG)).not.toContain("argControls");
-    const entry = shellEntry({ ...CONFIG, argControls: { rating: "/catalogue/controls/rating.tsx" } });
+    const entry = shellEntry({
+      ...CONFIG,
+      argControls: { rating: { module: "/catalogue/controls/rating.tsx", matches: [] } }
+    });
     expect(entry).toContain('"rating": () => import("\\u002fcatalogue\\u002fcontrols\\u002frating.tsx")');
+  });
+
+  it("gives the frame only the frame modules, imported on use", () => {
+    expect(frameEntry(CONFIG)).not.toContain("argControls");
+    const plain = { module: "/catalogue/controls/rating.tsx", matches: [] };
+    expect(frameEntry({ ...CONFIG, argControls: { rating: plain } })).not.toContain("argControls");
+    const entry = frameEntry({
+      ...CONFIG,
+      argControls: { rating: plain, icon: { ...plain, frame: "@acme/ui/icon-value" } }
+    });
+    expect(entry).toContain(
+      'argControls: {\n      "icon": () => import("@acme\\u002fui\\u002ficon-value"),\n    },'
+    );
+    expect(entry).not.toContain("rating");
   });
 });
