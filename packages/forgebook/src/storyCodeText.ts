@@ -26,6 +26,11 @@ export type StoryCodeSource = {
   readonly args: PanelArgs;
   /** The args the panel or an agent set, written from their values; none by default. */
   readonly edited?: readonly string[];
+  /**
+   * The code a custom control writes some values as, by arg (`controlCode.ts`): used where the file writes no code of
+   * its own for the arg, or the arg was set; none by default.
+   */
+  readonly argCode?: Readonly<Record<string, string>>;
 };
 
 /**
@@ -39,18 +44,23 @@ export const renderCodeOf = ({ code, exportName }: StoryCodeSource): StoryCode |
 };
 
 /**
- * The args the story's file writes as code, but those the panel or an agent set.
+ * The args written as code: those the story's file writes, but those the panel or an agent set, over those a control
+ * writes.
  *
  * @param source - the file's code, the story and what was set.
  */
 export const writtenArgsOf = ({
   code,
   exportName,
-  edited = []
+  edited = [],
+  argCode = {}
 }: StoryCodeSource): Readonly<Record<string, string>> => {
   const entry = code[exportName];
-  if (entry === undefined || !("args" in entry)) return {};
-  return Object.fromEntries(Object.entries(entry.args).filter(([name]) => !edited.includes(name)));
+  const own = entry === undefined || !("args" in entry) ? {} : entry.args;
+  return {
+    ...argCode,
+    ...Object.fromEntries(Object.entries(own).filter(([name]) => !edited.includes(name)))
+  };
 };
 
 /**

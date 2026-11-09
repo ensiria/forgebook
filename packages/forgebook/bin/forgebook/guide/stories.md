@@ -32,7 +32,8 @@ The framework's own guide (`forgebook guide <framework>`) has what differs in yo
   `mount`, so the commands can read it. Registered as `{ module, frame, matches: { typeName: "IconComponent" } }`, it takes
   every prop of that type (or `propName`) in stories whose `argTypes` name no control for it, with no story code: a prop's
   `typeNames` say the aliases its type goes through. The value stays JSON (an icon's name); the `frame` module's
-  `toStoryValue(value, argType)` turns it into what the story receives.
+  `toStoryValue(value, argType)` turns it into what the story receives; the module's optional `toCode(value, argType)`
+  gives the expression the story's code writes (`icon={IconStar}`).
 - A prop's TSDoc can ask for design tokens (`@token color`, a token's type or a part of its name), a story's arg with
   `argTypes: { x: { control: { type: "token", of: "space", format: "var(--{name})" } } }`.
 - Story ids are Storybook's (`inputs-readmore--open-by-default`, prefixed by the source's id); the commands also take

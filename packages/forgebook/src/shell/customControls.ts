@@ -44,7 +44,8 @@ const isControlModule = (value: unknown): value is ArgControlModule =>
   "mount" in value &&
   typeof value.mount === "function" &&
   "schema" in value &&
-  isValueSchema(value.schema);
+  isValueSchema(value.schema) &&
+  (!("toCode" in value) || value.toCode === undefined || typeof value.toCode === "function");
 
 /** Each control's load, kept: every field and check of a page share one. */
 const loads = new Map<() => Promise<unknown>, Promise<LoadedControl>>();

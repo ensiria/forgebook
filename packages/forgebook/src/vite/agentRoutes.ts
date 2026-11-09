@@ -20,13 +20,15 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { StorySource } from "@forgebook/story-format/source";
 import { createIdResolver, type ViteDevServer } from "vite";
 
-import type { ValueSchema } from "../argControl.ts";
+import type { ControlArgType, ValueSchema } from "../argControl.ts";
 import { offersUsedIn, readsComponentDocs } from "../catalogue.ts";
 import { isComponentDocs } from "../componentDocs.ts";
+import type { ControlCoders } from "../controlCode.ts";
 import type { StoryCodeWriter } from "../frame/renderer.ts";
 import { type LoadedPreview, mergedPreviews, NO_PREVIEW, readPreview } from "../frame/storyModule.ts";
 import type { FramesPlacement, PageOrigins } from "../frameOrigins.ts";
 import type { LiveErrors } from "../liveErrors.ts";
+import type { JsonValue } from "../plugin.ts";
 import { sourceFiles } from "../sourceFiles.ts";
 import type { CustomControlsRead } from "../storyControls.ts";
 import { catalogueStatuses } from "../storyStatuses.ts";
@@ -295,7 +297,8 @@ export const storyAnswer = async (context: RouteContext): Promise<AgentAnswer> =
       : {
           code: await settled(files.code[file]),
           writer: await codeWriterOf(config, context.server),
-          namedValues: source.namedValues
+          namedValues: source.namedValues,
+          coders: parts.customControls?.coders ?? {}
         };
   const index = offersUsedIn(config.lists) ? await sourceUsage(source) : undefined;
   // a usage that cannot be read leaves "Used in" out, never the story
@@ -359,17 +362,31 @@ const typedControlNames = (
 /** How long a control's module may take to load for an answer: one that hangs must not hold every answer with it. */
 const CONTROL_LOAD_MS = 5000;
 
-/** A control's schema, loaded on the server; a text says why there is none. */
-const controlSchemaOf = async (module: string, server: AgentServer): Promise<ValueSchema | string> => {
+/** A control's module as the server reads it: its schema and what writes its values as code; a text says why not. */
+const controlReadOf = async (
+  module: string,
+  server: AgentServer
+): Promise<{ readonly schema: ValueSchema; readonly toCode: ControlCoders[string] } | string> => {
   try {
     const id = await server.resolveSource(module);
     const timeout = new Promise<never>((_resolve, reject) => {
       setTimeout(() => reject(new Error(`no answer in ${CONTROL_LOAD_MS} ms`)), CONTROL_LOAD_MS).unref();
     });
     const loaded = await Promise.race([server.load(id ?? module), timeout]);
-    const schema =
-      typeof loaded === "object" && loaded !== null && "schema" in loaded ? loaded.schema : undefined;
-    return isValueSchema(schema) ? schema : "its module exports no schema Forgebook can read";
+    const isModule = typeof loaded === "object" && loaded !== null;
+    const schema = isModule && "schema" in loaded ? loaded.schema : undefined;
+    const toCode = isModule && "toCode" in loaded ? loaded.toCode : undefined;
+    if (!isValueSchema(schema)) return "its module exports no schema Forgebook can read";
+    return {
+      schema,
+      toCode:
+        typeof toCode === "function"
+          ? (value: JsonValue, argType: ControlArgType): string | undefined => {
+              const code: unknown = toCode(value, argType);
+              return typeof code === "string" ? code : undefined;
+            }
+          : undefined
+    };
   } catch (error) {
     return `its module cannot be read on the server: ${error instanceof Error ? error.message : String(error)}`;
   }
@@ -394,11 +411,14 @@ const customControlsRead = async (
     return control === undefined ? [] : [[name, control.module] as const];
   });
   const read = await Promise.all(
-    known.map(async ([name, module]) => [name, await controlSchemaOf(module, server)] as const)
+    known.map(async ([name, module]) => [name, await controlReadOf(module, server)] as const)
   );
   return {
     schemas: Object.fromEntries(
-      read.flatMap(([name, each]) => (typeof each === "string" ? [] : [[name, each]]))
+      read.flatMap(([name, each]) => (typeof each === "string" ? [] : [[name, each.schema]]))
+    ),
+    coders: Object.fromEntries(
+      read.flatMap(([name, each]) => (typeof each === "string" ? [] : [[name, each.toCode]]))
     ),
     problems: Object.fromEntries(
       read.flatMap(([name, each]) => (typeof each === "string" ? [[name, each]] : []))

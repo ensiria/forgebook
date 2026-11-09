@@ -11,12 +11,15 @@
  */
 import type { StoryFileCode } from "@forgebook/story-format/source";
 
+import { panelProps } from "../argTypes.ts";
 import { type ComponentDocs, codeNameOf } from "../componentDocs.ts";
+import { type ControlCoders, controlCodeOf } from "../controlCode.ts";
 import { panelArgsOf } from "../frame/panelValues.ts";
 import type { StoryCodeWriter } from "../frame/renderer.ts";
 import { type LoadedPreview, readStory } from "../frame/storyModule.ts";
 import type { ArgValue } from "../messages.ts";
 import type { NamedValues } from "../namedValues.ts";
+import { panelArgTypesOf } from "../storyArgTypes.ts";
 import { storyCodeText } from "../storyCodeText.ts";
 import type { StoryLocation } from "../storyTree.ts";
 import type { StoryDocument } from "./agent.types.ts";
@@ -29,6 +32,8 @@ export type AgentCodeParts = {
   readonly writer: StoryCodeWriter | undefined;
   /** The source's named values, as the frame writes them by name. */
   readonly namedValues: NamedValues | undefined;
+  /** What writes each custom control's values as code, by control; none writes them as JSON. */
+  readonly coders?: ControlCoders;
 };
 
 /** Whether a module's answer is a story file's code, by export name. */
@@ -62,13 +67,16 @@ export const agentStoryCode = (
   const loaded = readStory(module, location.story.exportName, preview);
   const value = "value" in parts.code ? parts.code.value : undefined;
   if (typeof loaded === "string" || !isStoryFileCode(value) || parts.writer === undefined) return undefined;
+  const args = { ...panelArgsOf(loaded.args, parts.namedValues), ...accepted };
+  const props = panelProps(docs?.props ?? [], panelArgTypesOf(loaded.argTypes, []), args);
   return storyCodeText(
     {
       code: value,
       exportName: location.story.exportName,
       componentName: docs === undefined ? location.component.name : codeNameOf(docs),
-      args: { ...panelArgsOf(loaded.args, parts.namedValues), ...accepted },
-      edited: Object.keys(accepted)
+      args,
+      edited: Object.keys(accepted),
+      argCode: controlCodeOf(props, args, parts.coders ?? {})
     },
     parts.writer
   );

@@ -12,6 +12,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import type { ArgControlModule, ControlArgType } from "../argControl.ts";
 import type { PanelProp } from "../argTypes.ts";
+import { controlArgTypeOf } from "../controlCode.ts";
 import { type ArgValue, isArgValue, UNSET_ARG } from "../messages.ts";
 import { useCatalogue } from "./catalogueContext.ts";
 import {
@@ -36,19 +37,6 @@ export type CustomControlProps = {
   /** Called with a changed value. */
   readonly onValueChange: OnValueChange;
 };
-
-/** What a control is told of its arg. */
-const argTypeOf = (prop: PanelProp): ControlArgType => ({
-  name: prop.name,
-  label: prop.label ?? prop.name,
-  description: prop.description,
-  ...(prop.choices === undefined ? {} : { options: prop.choices }),
-  ...(prop.min === undefined ? {} : { min: prop.min }),
-  ...(prop.max === undefined ? {} : { max: prop.max }),
-  ...(prop.step === undefined ? {} : { step: prop.step }),
-  // the frame's word, read here since only a control needs it: what is no plain data never reaches a control
-  ...(prop.settings === undefined || !isArgValue(prop.settings) ? {} : { settings: prop.settings })
-});
 
 /** The value as text, to tell whether it is still the one the control gave. */
 const textOf = (value: ArgValue | undefined): string => JSON.stringify(value) ?? "";
@@ -158,7 +146,7 @@ const MountedControl = ({
     given.current = textOf(value);
     setMounts(mounts + 1);
   }
-  const argType = argTypeOf(prop);
+  const argType = controlArgTypeOf(prop);
   const { strings: catalogueStrings } = useCatalogue();
   const strings = useMemo(() => controlStringsOf(catalogueStrings, name), [catalogueStrings, name]);
   return (
