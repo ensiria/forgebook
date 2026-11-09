@@ -132,8 +132,10 @@ export const Opened: Story<typeof Menu> = {
 ## Stories that load
 
 A frame waits for what a story loads before it says the story is ready, so checks never read a fallback. With React
-(Next.js and React Native too) and Vue (Nuxt too) that is every `Suspense` boundary, for up to 10 s. Past that, the story
-is `pending`, and `check` and `verify` report it as not verified. Say when that is intended, or give it longer:
+(Next.js and React Native too) and Vue (Nuxt too) that is every `Suspense` boundary; with any framework, also each module
+the story imports with `import()` while it is first drawn, until it has loaded or failed. The wait lasts up to 10 s. Past
+that, the story is `pending`, and `check` and `verify` report it as not verified. Say when that is intended, or give it
+longer:
 
 ```tsx
 export const Loading = { parameters: { suspense: { expected: true } } };

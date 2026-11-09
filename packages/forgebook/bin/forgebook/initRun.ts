@@ -213,7 +213,7 @@ const planOf = async (projectDir: string, request: InitRequest, context: InitCon
       title: made.title,
       stories: made.stories,
       preview: undefined,
-      switches: undefined,
+      switches: made.switches,
       notes: []
     },
     preview: made.preview,
