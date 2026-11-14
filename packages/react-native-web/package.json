@@ -41,10 +41,10 @@
   },
   "dependencies": {
     "@forgebook/react": "workspace:*",
-    "@vitejs/plugin-react": "6.1.2",
-    "flow-remove-types": "2.338.0",
+    "@vitejs/plugin-react": "6.3.0",
+    "flow-remove-types": "2.339.0",
     "postcss-load-config": "6.0.1",
-    "vite": "^8.3.4"
+    "vite": "^8.3.8"
   },
   "peerDependencies": {
     "@babel/core": "^7.29.0",
@@ -84,7 +84,7 @@
     "react-dom": "19.3.0",
     "react-native": "0.88.1",
     "react-native-web": "0.21.4",
-    "vite": "8.3.5",
+    "vite": "8.3.8",
     "vitest": "5.0.5"
   },
   "publishConfig": {
