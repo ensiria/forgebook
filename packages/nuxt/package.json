@@ -52,7 +52,7 @@
     "@forgebook/vue": "workspace:*",
     "magic-string": "1.4.5",
     "unimport": "7.0.2",
-    "vite": "^8.3.4"
+    "vite": "^8.3.8"
   },
   "peerDependencies": {
     "forgebook": "workspace:^",
@@ -67,7 +67,7 @@
     "@vitejs/plugin-vue": "6.0.10",
     "forgebook": "workspace:*",
     "happy-dom": "21.0.4",
-    "vite": "8.3.5",
+    "vite": "8.3.8",
     "vitest": "5.0.5",
     "vue": "3.5.44",
     "vue-router": "5.4.0"

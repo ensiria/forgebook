@@ -34,10 +34,10 @@
     "typecheck": "tsc -p src && tsc -p src/vite && tsc -p test"
   },
   "dependencies": {
-    "@analogjs/vite-plugin-angular": "2.9.5",
+    "@analogjs/vite-plugin-angular": "2.9.6",
     "@forgebook/story-format": "workspace:*",
     "typescript-6": "npm:typescript@6.0.3",
-    "vite": "^8.3.4"
+    "vite": "^8.3.8"
   },
   "peerDependencies": {
     "@angular/build": "^20.0.0 || ^21.0.0 || ^22.0.0",
@@ -70,7 +70,7 @@
     "happy-dom": "21.0.4",
     "rxjs": "7.8.2",
     "typescript": "npm:typescript@6.0.3",
-    "vite": "8.3.5",
+    "vite": "8.3.8",
     "vitest": "5.0.5"
   },
   "publishConfig": {

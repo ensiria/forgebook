@@ -27,9 +27,9 @@
     "msw": "3.0.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "sass-embedded": "1.106.1",
+    "sass-embedded": "1.108.2",
     "typescript": "npm:typescript@6.0.3",
-    "vite": "8.3.5",
+    "vite": "8.3.8",
     "vitest": "5.0.5"
   }
 }

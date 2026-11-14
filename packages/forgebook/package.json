@@ -98,13 +98,13 @@
     "typecheck": "tsc -p src && tsc -p src/vite && tsc -p bin && tsc -p test"
   },
   "dependencies": {
-    "@ensiria/cli-kit": "^0.1.1",
+    "@ensiria/cli-kit": "^0.1.3",
     "@forgebook/story-format": "workspace:*",
     "axe-core": "4.14.0",
     "lightningcss": "1.33.0",
-    "marked": "18.1.0",
+    "marked": "18.2.0",
     "typescript-6": "npm:typescript@6.0.3",
-    "vite": "^8.3.4"
+    "vite": "^8.3.8"
   },
   "peerDependencies": {
     "@testing-library/dom": "^10.4.0",
@@ -124,8 +124,8 @@
     "happy-dom": "21.0.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "sass-embedded": "1.106.1",
-    "vite": "8.3.5",
+    "sass-embedded": "1.108.2",
+    "vite": "8.3.8",
     "vitest": "5.0.5"
   },
   "peerDependenciesMeta": {
