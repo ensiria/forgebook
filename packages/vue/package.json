@@ -50,12 +50,12 @@
     "@forgebook/testing": "workspace:*",
     "@forgebook/tools": "workspace:*",
     "@forgebook/typescript-config": "workspace:*",
-    "@types/node": "24.19.2",
+    "@types/node": "26.6.6",
     "forgebook": "workspace:*",
     "happy-dom": "21.0.4",
     "vite": "8.3.5",
-    "vitest": "5.0.5",
-    "vue": "3.5.44"
+    "vitest": "5.1.0",
+    "vue": "3.5.45"
   },
   "publishConfig": {
     "access": "public",
